@@ -21,8 +21,15 @@ jobs:
           git remote add upstream https://github.com/shuaiplus/nodewarden.git || true
           git fetch upstream
 
-          # 强制让当前分支完全等于 upstream
-          git reset --hard upstream/main
+          # Get all files from upstream except .github/workflows/
+          git checkout upstream/main -- .
+          git checkout HEAD -- .github/workflows/
 
-          # 强制推送
-          git push origin main --force
+          # Commit and push if there are changes
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to sync"
+          else
+            git commit -m "chore: sync with upstream"
+            git push origin main
+          fi
