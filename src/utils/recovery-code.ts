@@ -1,4 +1,6 @@
 const RECOVERY_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+const RECOVERY_ALPHABET_LENGTH = RECOVERY_ALPHABET.length;
+const RECOVERY_MAX_UNBIASED_BYTE = Math.floor(256 / RECOVERY_ALPHABET_LENGTH) * RECOVERY_ALPHABET_LENGTH;
 
 function normalizeRecoveryCode(raw: string): string {
   return String(raw || '').toUpperCase().replace(/[^A-Z2-7]/g, '');
@@ -9,15 +11,14 @@ function formatRecoveryCode(compact: string): string {
 }
 
 export function createRecoveryCode(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(20));
   let compact = '';
-  for (const b of bytes) {
-    compact += RECOVERY_ALPHABET[b % RECOVERY_ALPHABET.length];
-  }
-  // 20 bytes -> 20 chars in this simple mapping. Expand to 32 chars for friendlier grouping.
   while (compact.length < 32) {
-    const extra = crypto.getRandomValues(new Uint8Array(1))[0];
-    compact += RECOVERY_ALPHABET[extra % RECOVERY_ALPHABET.length];
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    for (const b of bytes) {
+      if (b >= RECOVERY_MAX_UNBIASED_BYTE) continue;
+      compact += RECOVERY_ALPHABET[b % RECOVERY_ALPHABET_LENGTH];
+      if (compact.length >= 32) break;
+    }
   }
   return formatRecoveryCode(compact.slice(0, 32));
 }

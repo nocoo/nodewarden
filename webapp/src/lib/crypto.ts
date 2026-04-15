@@ -18,8 +18,17 @@ export function concatBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
   return out;
 }
 
-function toBufferSource(bytes: Uint8Array): ArrayBuffer {
+export function toBufferSource(bytes: Uint8Array): ArrayBuffer {
   return new Uint8Array(bytes).buffer;
+}
+
+function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    diff |= a[i] ^ b[i];
+  }
+  return diff === 0;
 }
 
 export async function pbkdf2(
@@ -116,7 +125,7 @@ export async function decryptBwFileData(encrypted: Uint8Array, encKey: Uint8Arra
   const mac = encrypted.slice(17, 49);
   const cipher = encrypted.slice(49);
   const expected = await hmacSha256(macKey, concatBytes(iv, cipher));
-  if (bytesToBase64(expected) !== bytesToBase64(mac)) throw new Error('MAC mismatch');
+  if (!constantTimeEqual(expected, mac)) throw new Error('MAC mismatch');
   return decryptAesCbc(cipher, encKey, iv);
 }
 
@@ -147,7 +156,7 @@ export async function decryptBw(cipherString: string, encKey: Uint8Array, macKey
   const parsed = parseCipherString(cipherString);
   if (parsed.type === 2 && macKey && parsed.mac) {
     const expected = await hmacSha256(macKey, concatBytes(parsed.iv, parsed.ct));
-    if (bytesToBase64(expected) !== bytesToBase64(parsed.mac)) throw new Error('MAC mismatch');
+    if (!constantTimeEqual(expected, parsed.mac)) throw new Error('MAC mismatch');
   }
   return decryptAesCbc(parsed.ct, encKey, parsed.iv);
 }
@@ -158,19 +167,44 @@ export async function decryptStr(cipherString: string | null | undefined, encKey
   return new TextDecoder().decode(plain);
 }
 
-export function extractTotpSecret(raw: string): string {
-  if (!raw) return '';
+function normalizeTotpSecret(secret: string): string {
+  return secret.toUpperCase().replace(/[\s-]/g, '').replace(/=+$/g, '');
+}
+
+function parseSteamSecret(raw: string): string {
+  const match = raw.trim().match(/^steam:\/\/([^/?#]+)(?:[/?#].*)?$/i);
+  if (!match?.[1]) return '';
+  try {
+    return normalizeTotpSecret(decodeURIComponent(match[1]));
+  } catch {
+    return normalizeTotpSecret(match[1]);
+  }
+}
+
+function parseTotpConfig(raw: string): { secret: string; steam: boolean } {
+  if (!raw) return { secret: '', steam: false };
   const s = raw.trim();
-  if (!s) return '';
+  if (!s) return { secret: '', steam: false };
+  if (/^steam:\/\//i.test(s)) {
+    return { secret: parseSteamSecret(s), steam: true };
+  }
   if (/^otpauth:\/\//i.test(s)) {
     try {
       const u = new URL(s);
-      return (u.searchParams.get('secret') || '').toUpperCase().replace(/[\s-]/g, '').replace(/=+$/g, '');
+      const label = decodeURIComponent((u.pathname || '').replace(/^\/+/, '')).toLowerCase();
+      const issuer = (u.searchParams.get('issuer') || '').trim().toLowerCase();
+      const algorithm = (u.searchParams.get('algorithm') || '').trim().toLowerCase();
+      const steam = issuer === 'steam' || label.startsWith('steam:') || algorithm === 'steam';
+      return { secret: normalizeTotpSecret(u.searchParams.get('secret') || ''), steam };
     } catch {
-      return '';
+      return { secret: '', steam: false };
     }
   }
-  return s.toUpperCase().replace(/[\s-]/g, '').replace(/=+$/g, '');
+  return { secret: normalizeTotpSecret(s), steam: false };
+}
+
+export function extractTotpSecret(raw: string): string {
+  return parseTotpConfig(raw).secret;
 }
 
 function base32ToBytes(input: string): Uint8Array {
@@ -193,7 +227,7 @@ function base32ToBytes(input: string): Uint8Array {
 }
 
 export async function calcTotpNow(rawSecret: string): Promise<{ code: string; remain: number } | null> {
-  const secret = extractTotpSecret(rawSecret);
+  const { secret, steam } = parseTotpConfig(rawSecret);
   if (!secret) return null;
   const keyBytes = base32ToBytes(secret);
   if (!keyBytes.length) return null;
@@ -212,6 +246,15 @@ export async function calcTotpNow(rawSecret: string): Promise<{ code: string; re
   const hs = new Uint8Array(await crypto.subtle.sign('HMAC', key, toBufferSource(message)));
   const offset = hs[hs.length - 1] & 0x0f;
   const bin = ((hs[offset] & 0x7f) << 24) | ((hs[offset + 1] & 0xff) << 16) | ((hs[offset + 2] & 0xff) << 8) | (hs[offset + 3] & 0xff);
-  const code = (bin % 1000000).toString().padStart(6, '0');
+  let code = (bin % 1000000).toString().padStart(6, '0');
+  if (steam) {
+    const chars = '23456789BCDFGHJKMNPQRTVWXY';
+    let value = bin;
+    code = '';
+    for (let i = 0; i < 5; i += 1) {
+      code += chars[value % chars.length];
+      value = Math.floor(value / chars.length);
+    }
+  }
   return { code, remain };
 }

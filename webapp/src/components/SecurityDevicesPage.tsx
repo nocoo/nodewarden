@@ -9,6 +9,7 @@ interface SecurityDevicesPageProps {
   onRevokeTrust: (device: AuthorizedDevice) => void;
   onRemoveDevice: (device: AuthorizedDevice) => void;
   onRevokeAll: () => void;
+  onRemoveAll: () => void;
 }
 
 function formatDateTime(value: string | null | undefined): string {
@@ -47,7 +48,7 @@ export default function SecurityDevicesPage(props: SecurityDevicesPageProps) {
           <div>
             <h3 style={{ margin: 0 }}>{t('txt_device_management')}</h3>
             <div className="muted-inline" style={{ marginTop: 4 }}>
-              {t('txt_manage_authorized_devices_and_30_day_totp_trusted_sessions')}
+              {t('txt_manage_device_sessions_and_30_day_totp_trusted_sessions')}
             </div>
           </div>
           <div className="actions">
@@ -58,6 +59,10 @@ export default function SecurityDevicesPage(props: SecurityDevicesPageProps) {
             <button type="button" className="btn btn-danger small" onClick={props.onRevokeAll}>
               <ShieldOff size={14} className="btn-icon" />
               {t('txt_revoke_all_trusted')}
+            </button>
+            <button type="button" className="btn btn-danger small" onClick={props.onRemoveAll}>
+              <Trash2 size={14} className="btn-icon" />
+              {t('txt_remove_all_devices')}
             </button>
           </div>
         </div>
@@ -70,6 +75,7 @@ export default function SecurityDevicesPage(props: SecurityDevicesPageProps) {
             <tr>
               <th>{t('txt_device')}</th>
               <th>{t('txt_type')}</th>
+              <th>{t('txt_status')}</th>
               <th>{t('txt_added')}</th>
               <th>{t('txt_last_seen')}</th>
               <th>{t('txt_trusted_until')}</th>
@@ -79,14 +85,19 @@ export default function SecurityDevicesPage(props: SecurityDevicesPageProps) {
           <tbody>
             {props.devices.map((device) => (
               <tr key={device.identifier}>
-                <td>
+                <td data-label={t('txt_device')}>
                   <div>{device.name || t('txt_unknown_device')}</div>
                   <div className="muted-inline">{device.identifier}</div>
                 </td>
-                <td>{mapDeviceTypeName(device.type)}</td>
-                <td>{formatDateTime(device.creationDate)}</td>
-                <td>{formatDateTime(device.revisionDate)}</td>
-                <td>
+                <td data-label={t('txt_type')}>{mapDeviceTypeName(device.type)}</td>
+                <td data-label={t('txt_status')}>
+                  <span className={`device-status-pill ${device.online ? 'online' : 'offline'}`}>
+                    {device.online ? t('txt_online') : t('txt_offline')}
+                  </span>
+                </td>
+                <td data-label={t('txt_added')}>{formatDateTime(device.creationDate)}</td>
+                <td data-label={t('txt_last_seen')}>{formatDateTime(device.revisionDate)}</td>
+                <td data-label={t('txt_trusted_until')}>
                   {device.trusted ? (
                     <div className="trusted-cell">
                       <Clock3 size={13} />
@@ -96,7 +107,7 @@ export default function SecurityDevicesPage(props: SecurityDevicesPageProps) {
                     <span className="muted-inline">{t('txt_not_trusted')}</span>
                   )}
                 </td>
-                <td>
+                <td data-label={t('txt_actions')}>
                   <div className="actions">
                     <button
                       type="button"
@@ -117,7 +128,7 @@ export default function SecurityDevicesPage(props: SecurityDevicesPageProps) {
             ))}
             {!props.loading && props.devices.length === 0 && (
               <tr>
-                <td colSpan={6}>
+                <td colSpan={7}>
                   <div className="empty" style={{ minHeight: 80 }}>{t('txt_no_devices_found')}</div>
                 </td>
               </tr>

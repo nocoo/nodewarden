@@ -1,6 +1,6 @@
 {
   "name": "nodewarden",
-  "version": "1.1.0",
+  "version": "1.4.2",
   "description": "Minimal Bitwarden-compatible server running on Cloudflare Workers",
   "author": "shuaiplus",
   "license": "LGPL-3.0",
@@ -8,8 +8,10 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev -c wrangler.toml",
+    "dev:kv": "wrangler dev -c wrangler.kv.toml",
     "build": "vite build --config webapp/vite.config.ts",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "deploy:kv": "wrangler deploy -c wrangler.kv.toml"
   },
   "keywords": [
     "bitwarden",
@@ -28,6 +30,9 @@
       },
       "ATTACHMENTS": {
         "description": "R2 bucket for storing file attachments"
+      },
+      "ATTACHMENTS_KV": {
+        "description": "Optional KV namespace fallback for attachment/send-file storage"
       }
     }
   },
@@ -38,9 +43,12 @@
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
-    "wrangler": "^4.69.0"
+    "wrangler": "^4.71.0"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@noble/hashes": "^2.0.1",
     "@tanstack/react-query": "^5.90.21",
     "@zip.js/zip.js": "^2.8.22",

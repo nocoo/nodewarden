@@ -72,3 +72,7 @@ export function readKnownDeviceProbe(request: Request): { email: string | null; 
   return { email, deviceIdentifier };
 }
 
+export function readActingDeviceIdentifier(request: Request): string | null {
+  return normalizeDeviceIdentifier(request.headers.get('X-NodeWarden-Acting-Device-Id'));
+}
+

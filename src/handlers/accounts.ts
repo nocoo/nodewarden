@@ -7,6 +7,7 @@ import { generateUUID } from '../utils/uuid';
 import { LIMITS } from '../config/limits';
 import { isTotpEnabled, verifyTotpToken } from '../utils/totp';
 import { createRecoveryCode, recoveryCodeEquals } from '../utils/recovery-code';
+import { buildAccountKeys } from '../utils/user-decryption';
 
 function looksLikeEncString(value: string): boolean {
   if (!value) return false;
@@ -45,11 +46,25 @@ function validateKdfParams(kdfType: number | undefined, kdfIterations: number | 
 }
 
 function normalizeTotpSecret(input: string): string {
-  return input.toUpperCase().replace(/[\s-]/g, '').replace(/=+$/g, '');
+  const raw = String(input || '').toUpperCase();
+  let out = '';
+  for (const char of raw) {
+    if (char === ' ' || char === '\t' || char === '\n' || char === '\r' || char === '-') continue;
+    out += char;
+  }
+  while (out.endsWith('=')) {
+    out = out.slice(0, -1);
+  }
+  return out;
 }
 
 function normalizeRecoveryCodeInput(input: string): string {
   return String(input || '').toUpperCase().replace(/[^A-Z2-7]/g, '');
+}
+
+function normalizeMasterPasswordHint(input: string | null | undefined): string | null {
+  const normalized = String(input || '').trim();
+  return normalized ? normalized : null;
 }
 
 function jwtSecretUnsafeReason(env: Env): 'missing' | 'default' | 'too_short' | null {
@@ -60,7 +75,19 @@ function jwtSecretUnsafeReason(env: Env): 'missing' | 'default' | 'too_short' | 
   return null;
 }
 
+async function verifyUserSecret(
+  auth: AuthService,
+  user: User,
+  secret: string | null | undefined
+): Promise<boolean> {
+  const normalized = String(secret || '').trim();
+  if (!normalized) return false;
+  return auth.verifyPassword(normalized, user.masterPasswordHash, user.email);
+}
+
 function toProfile(user: User, env: Env): ProfileResponse {
+  void env;
+  const accountKeys = buildAccountKeys(user);
   return {
     id: user.id,
     name: user.name,
@@ -69,12 +96,12 @@ function toProfile(user: User, env: Env): ProfileResponse {
     premium: true,
     premiumFromOrganization: false,
     usesKeyConnector: false,
-    masterPasswordHint: null,
+    masterPasswordHint: user.masterPasswordHint,
     culture: 'en-US',
     twoFactorEnabled: !!user.totpSecret,
     key: user.key,
     privateKey: user.privateKey,
-    accountKeys: null,
+    accountKeys,
     securityStamp: user.securityStamp || user.id,
     organizations: [],
     providers: [],
@@ -82,6 +109,7 @@ function toProfile(user: User, env: Env): ProfileResponse {
     forcePasswordReset: false,
     avatarColor: null,
     creationDate: user.createdAt,
+    verifyDevices: user.verifyDevices,
     role: user.role,
     status: user.status,
     object: 'profile',
@@ -114,6 +142,7 @@ export async function handleRegister(request: Request, env: Env): Promise<Respon
     kdfMemory?: number;
     kdfParallelism?: number;
     inviteCode?: string;
+    masterPasswordHint?: string;
     keys?: {
       publicKey?: string;
       encryptedPrivateKey?: string;
@@ -133,6 +162,7 @@ export async function handleRegister(request: Request, env: Env): Promise<Respon
   const privateKey = body.keys?.encryptedPrivateKey;
   const publicKey = body.keys?.publicKey;
   const inviteCode = (body.inviteCode || '').trim();
+  const masterPasswordHint = normalizeMasterPasswordHint(body.masterPasswordHint);
 
   if (!email || !masterPasswordHash || !key) {
     return errorResponse('Email, masterPasswordHash, and key are required', 400);
@@ -149,6 +179,9 @@ export async function handleRegister(request: Request, env: Env): Promise<Respon
   if (!looksLikeEncString(privateKey)) {
     return errorResponse('encryptedPrivateKey is not a valid encrypted string', 400);
   }
+  if (masterPasswordHint && masterPasswordHint.length > 120) {
+    return errorResponse('masterPasswordHint must be 120 characters or fewer', 400);
+  }
 
   const kdfErr = validateKdfParams(body.kdf, body.kdfIterations, body.kdfMemory, body.kdfParallelism);
   if (kdfErr) return errorResponse(kdfErr, 400);
@@ -161,6 +194,7 @@ export async function handleRegister(request: Request, env: Env): Promise<Respon
     id: generateUUID(),
     email,
     name: name || email,
+    masterPasswordHint,
     masterPasswordHash: serverHash,
     key,
     privateKey,
@@ -172,6 +206,7 @@ export async function handleRegister(request: Request, env: Env): Promise<Respon
     securityStamp: generateUUID(),
     role: 'user',
     status: 'active',
+    verifyDevices: true,
     totpSecret: null,
     totpRecoveryCode: null,
     createdAt: now,
@@ -231,6 +266,80 @@ export async function handleRegister(request: Request, env: Env): Promise<Respon
   return jsonResponse({ success: true, role: user.role }, 200);
 }
 
+// POST /api/accounts/password-hint
+export async function handleGetPasswordHint(request: Request, env: Env): Promise<Response> {
+  const storage = new StorageService(env.DB);
+  const clientIdentifier = getClientIdentifier(request);
+  if (!clientIdentifier) {
+    return errorResponse('Client IP is required', 403);
+  }
+
+  let body: { email?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return errorResponse('Invalid JSON', 400);
+  }
+
+  const email = String(body.email || '').trim().toLowerCase();
+  if (!email) {
+    return errorResponse('Email is required', 400);
+  }
+
+  const rateLimit = new RateLimitService(env.DB);
+  const minuteBudget = await rateLimit.consumeBudgetWithWindow(
+    `${clientIdentifier}:password-hint`,
+    LIMITS.rateLimit.passwordHintRequestsPerMinute,
+    60
+  );
+  if (!minuteBudget.allowed) {
+    return new Response(
+      JSON.stringify({
+        error: 'Too many requests',
+        error_description: `Rate limit exceeded. Try again in ${minuteBudget.retryAfterSeconds || 60} seconds.`,
+      }),
+      {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': String(minuteBudget.retryAfterSeconds || 60),
+          'X-RateLimit-Remaining': '0',
+        },
+      }
+    );
+  }
+
+  const hourlyBudget = await rateLimit.consumeBudgetWithWindow(
+    `${clientIdentifier}:password-hint-hour`,
+    LIMITS.rateLimit.passwordHintRequestsPerHour,
+    60 * 60
+  );
+  if (!hourlyBudget.allowed) {
+    return new Response(
+      JSON.stringify({
+        error: 'Too many requests',
+        error_description: `Rate limit exceeded. Try again in ${hourlyBudget.retryAfterSeconds || 3600} seconds.`,
+      }),
+      {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': String(hourlyBudget.retryAfterSeconds || 3600),
+          'X-RateLimit-Remaining': '0',
+        },
+      }
+    );
+  }
+
+  const user = await storage.getUser(email);
+  const hint = user?.status === 'active' ? normalizeMasterPasswordHint(user.masterPasswordHint) : null;
+  return jsonResponse({
+    object: 'passwordHint',
+    hasHint: !!hint,
+    masterPasswordHint: hint,
+  });
+}
+
 // GET /api/accounts/profile
 export async function handleGetProfile(request: Request, env: Env, userId: string): Promise<Response> {
   void request;
@@ -246,34 +355,59 @@ export async function handleUpdateProfile(request: Request, env: Env, userId: st
   const user = await storage.getUserById(userId);
   if (!user) return errorResponse('User not found', 404);
 
-  let body: { name?: string; email?: string };
+  let body: {
+    masterPasswordHint?: string | null;
+  };
   try {
     body = await request.json();
   } catch {
     return errorResponse('Invalid JSON', 400);
   }
 
-  if (typeof body.name === 'string') {
-    user.name = body.name.trim() || user.name;
+  const masterPasswordHint = normalizeMasterPasswordHint(body.masterPasswordHint);
+  if (masterPasswordHint && masterPasswordHint.length > 120) {
+    return errorResponse('masterPasswordHint must be 120 characters or fewer', 400);
   }
-  if (typeof body.email === 'string') {
-    const normalized = body.email.trim().toLowerCase();
-    if (!normalized) return errorResponse('Email is required', 400);
-    user.email = normalized;
-  }
+
+  user.masterPasswordHint = masterPasswordHint;
   user.updatedAt = new Date().toISOString();
+  await storage.saveUser(user);
 
+  return jsonResponse(toProfile(user, env));
+}
+
+// PUT/POST /api/accounts/verify-devices
+export async function handleSetVerifyDevices(request: Request, env: Env, userId: string): Promise<Response> {
+  const storage = new StorageService(env.DB);
+  const auth = new AuthService(env);
+  const user = await storage.getUserById(userId);
+  if (!user) return errorResponse('User not found', 404);
+
+  let body: {
+    secret?: string;
+    masterPasswordHash?: string;
+    verifyDevices?: boolean;
+  };
   try {
-    await storage.saveUser(user);
-  } catch (error) {
-    const msg = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-    if (msg.includes('unique') || msg.includes('constraint')) {
-      return errorResponse('Email already registered', 409);
-    }
-    throw error;
+    body = await request.json();
+  } catch {
+    return errorResponse('Invalid JSON', 400);
   }
 
-  return handleGetProfile(request, env, userId);
+  if (typeof body.verifyDevices !== 'boolean') {
+    return errorResponse('verifyDevices must be true or false', 400);
+  }
+
+  const verified = await verifyUserSecret(auth, user, body.secret || body.masterPasswordHash);
+  if (!verified) {
+    return errorResponse('User verification failed.', 400);
+  }
+
+  user.verifyDevices = body.verifyDevices;
+  user.updatedAt = new Date().toISOString();
+  await storage.saveUser(user);
+
+  return new Response(null, { status: 200 });
 }
 
 // POST /api/accounts/keys
@@ -308,15 +442,16 @@ export async function handleSetKeys(request: Request, env: Env, userId: string):
     return errorResponse('Invalid password', 400);
   }
 
-  if (body.key) user.key = body.key;
-  if (body.encryptedPrivateKey) user.privateKey = body.encryptedPrivateKey;
-  if (body.publicKey) user.publicKey = body.publicKey;
   if (body.key && !looksLikeEncString(body.key)) {
     return errorResponse('key is not a valid encrypted string', 400);
   }
   if (body.encryptedPrivateKey && !looksLikeEncString(body.encryptedPrivateKey)) {
     return errorResponse('encryptedPrivateKey is not a valid encrypted string', 400);
   }
+
+  if (body.key) user.key = body.key;
+  if (body.encryptedPrivateKey) user.privateKey = body.encryptedPrivateKey;
+  if (body.publicKey) user.publicKey = body.publicKey;
   user.updatedAt = new Date().toISOString();
 
   await storage.saveUser(user);
@@ -526,7 +661,11 @@ export async function handleRecoverTwoFactor(request: Request, env: Env): Promis
   const email = String(body.email || body.username || '').trim().toLowerCase();
   const masterPasswordHash = String(body.masterPasswordHash || body.password || '').trim();
   const recoveryCode = normalizeRecoveryCodeInput(String(body.recoveryCode || body.twoFactorToken || body.recovery_code || ''));
-  const recoverLimitKey = `${getClientIdentifier(request)}:recover-2fa:${email || 'unknown'}`;
+  const clientIdentifier = getClientIdentifier(request);
+  if (!clientIdentifier) {
+    return errorResponse('Client IP is required', 403);
+  }
+  const recoverLimitKey = `${clientIdentifier}:recover-2fa:${email || 'unknown'}`;
 
   const recoverAttemptCheck = await rateLimit.checkLoginAttempt(recoverLimitKey);
   if (!recoverAttemptCheck.allowed) {

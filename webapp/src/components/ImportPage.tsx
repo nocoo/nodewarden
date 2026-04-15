@@ -1,26 +1,26 @@
 ﻿import { useState } from 'preact/hooks';
 import { argon2idAsync } from '@noble/hashes/argon2.js';
+import { createPortal } from 'preact/compat';
 import { strFromU8, unzipSync } from 'fflate';
 import { BlobReader, Uint8ArrayWriter, ZipReader, configure as configureZipJs } from '@zip.js/zip.js';
-import { Archive, ArrowLeftRight, Download, FileJson, FileUp } from 'lucide-preact';
-import ConfirmDialog from '@/components/ConfirmDialog';
-import type { CiphersImportPayload } from '@/lib/api';
+import { Download, FileUp } from 'lucide-preact';
+import ConfirmDialog, { useDialogLifecycle } from '@/components/ConfirmDialog';
+import type { CiphersImportPayload } from '@/lib/api/vault';
 import {
   type EncryptedJsonMode,
   EXPORT_FORMATS,
-  type ExportDownloadPayload,
   type ExportFormatId,
   type ExportRequest,
 } from '@/lib/export-formats';
 import {
-  getFileAcceptBySource,
-  IMPORT_SOURCES,
-  type BitwardenJsonInput,
-  type ImportSourceId,
-  normalizeBitwardenEncryptedAccountImport,
-  normalizeBitwardenImport,
   parseImportPayloadBySource,
 } from '@/lib/import-formats';
+import { getFileAcceptBySource, IMPORT_SOURCES, type ImportSourceId } from '@/lib/import-format-sources';
+import {
+  type BitwardenJsonInput,
+  normalizeBitwardenEncryptedAccountImport,
+  normalizeBitwardenImport,
+} from '@/lib/import-formats-bitwarden';
 import { base64ToBytes, decryptStr, hkdfExpand, pbkdf2 } from '@/lib/crypto';
 import { t } from '@/lib/i18n';
 import type { Folder } from '@/lib/types';
@@ -48,13 +48,16 @@ interface ImportPageProps {
   accountKeys?: { encB64: string; macB64: string } | null;
   onNotify: (type: 'success' | 'error', text: string) => void;
   folders: Folder[];
-  onExport: (request: ExportRequest) => Promise<ExportDownloadPayload>;
+  onExport: (request: ExportRequest) => Promise<void>;
 }
 
 export interface ImportResultSummary {
   totalItems: number;
   folderCount: number;
   typeCounts: Array<{ label: string; count: number }>;
+  attachmentCount: number;
+  importedAttachmentCount: number;
+  failedAttachments: Array<{ fileName: string; reason: string }>;
 }
 
 interface BitwardenPasswordProtectedInput extends BitwardenJsonInput {
@@ -118,7 +121,7 @@ async function derivePasswordProtectedFileKey(
     const memoryMiB = Number(parsed.kdfMemory || 0);
     const parallelism = Number(parsed.kdfParallelism || 0);
     if (!Number.isFinite(memoryMiB) || memoryMiB <= 0 || !Number.isFinite(parallelism) || parallelism <= 0) {
-      throw new Error('Invalid Argon2id parameters in export file.');
+      throw new Error(t('txt_invalid_argon2id_params'));
     }
     const memoryKiB = Math.floor(memoryMiB * 1024);
     const maxmem = memoryKiB * 1024 + 1024 * 1024;
@@ -131,7 +134,7 @@ async function derivePasswordProtectedFileKey(
       asyncTick: 10,
     });
   } else {
-    throw new Error(`Unsupported kdfType: ${kdfType}`);
+    throw new Error(t('txt_unsupported_kdf_type', { type: String(kdfType) }));
   }
 
   const enc = await hkdfExpand(keyMaterial, 'enc', 32);
@@ -152,7 +155,7 @@ async function decryptPasswordProtectedExport(parsed: BitwardenPasswordProtected
   try {
     await decryptStr(parsed.encKeyValidation_DO_NOT_EDIT, key.enc, key.mac);
   } catch {
-    throw new Error('Invalid file password.');
+    throw new Error(t('txt_invalid_file_password'));
   }
 
   const plainJson = await decryptStr(parsed.data, key.enc, key.mac);
@@ -309,6 +312,8 @@ export default function ImportPage({ onImport, onImportEncryptedRaw, accountKeys
   const [exportAuthDialogOpen, setExportAuthDialogOpen] = useState(false);
   const [exportAuthPassword, setExportAuthPassword] = useState('');
   const [importSummary, setImportSummary] = useState<ImportResultSummary | null>(null);
+
+  useDialogLifecycle(!!importSummary, importSummary ? () => setImportSummary(null) : null);
   const commonSourceSet = new Set<ImportSourceId>(COMMON_IMPORT_SOURCE_IDS);
   const commonSources = IMPORT_SOURCES.filter((item) => commonSourceSet.has(item.id as ImportSourceId));
   const otherSources = IMPORT_SOURCES.filter((item) => !commonSourceSet.has(item.id as ImportSourceId));
@@ -317,16 +322,16 @@ export default function ImportPage({ onImport, onImportEncryptedRaw, accountKeys
     if (isRecord(parsed) && parsed.encrypted === true) {
       const accountEncrypted = parsed as BitwardenJsonInput;
       if (!accountKeys?.encB64 || !accountKeys?.macB64) {
-        throw new Error('Vault key unavailable. Please unlock vault and try again.');
+        throw new Error(t('txt_vault_key_unavailable'));
       }
       const validation = String(accountEncrypted.encKeyValidation_DO_NOT_EDIT || '').trim();
-      if (!validation) throw new Error('Invalid encrypted export file.');
+      if (!validation) throw new Error(t('txt_invalid_encrypted_export'));
       const accountEncKey = base64ToBytes(accountKeys.encB64);
       const accountMacKey = base64ToBytes(accountKeys.macB64);
       try {
         await decryptStr(validation, accountEncKey, accountMacKey);
       } catch {
-        throw new Error('This encrypted export belongs to another account.');
+        throw new Error(t('txt_export_belongs_to_another_account'));
       }
       return onImportEncryptedRaw(
         normalizeBitwardenEncryptedAccountImport(accountEncrypted),
@@ -355,7 +360,7 @@ export default function ImportPage({ onImport, onImportEncryptedRaw, accountKeys
     const encryptedPayload = String(parsed.nodewardenAttachmentsEnc || '').trim();
     if (!encryptedPayload) return [];
     if (!accountKeys?.encB64 || !accountKeys?.macB64) {
-      throw new Error('Vault key unavailable. Please unlock vault and try again.');
+      throw new Error(t('txt_vault_key_unavailable'));
     }
     const accountEnc = base64ToBytes(accountKeys.encB64);
     const accountMac = base64ToBytes(accountKeys.macB64);
@@ -463,6 +468,7 @@ export default function ImportPage({ onImport, onImportEncryptedRaw, accountKeys
   }
 
   async function handlePasswordImportConfirm() {
+    if (isPasswordSubmitting) return;
     if (!pendingPasswordImport) return;
     setIsPasswordSubmitting(true);
     try {
@@ -481,6 +487,7 @@ export default function ImportPage({ onImport, onImportEncryptedRaw, accountKeys
   }
 
   async function handleZipPasswordImportConfirm() {
+    if (isZipPasswordSubmitting) return;
     if (!pendingZipFile) return;
     setIsZipPasswordSubmitting(true);
     try {
@@ -536,23 +543,13 @@ export default function ImportPage({ onImport, onImportEncryptedRaw, accountKeys
 
     setIsExporting(true);
     try {
-      const payload = await onExport({
+      await onExport({
         format: exportFormat,
         encryptedJsonMode: exportNeedsMode ? encryptedJsonMode : undefined,
         filePassword,
         zipPassword: exportIsZip ? zipPass : '',
         masterPassword,
       });
-      const blobBytes = Uint8Array.from(payload.bytes);
-      const blob = new Blob([blobBytes], { type: payload.mimeType });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = payload.fileName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
       onNotify('success', t('txt_export_completed'));
     } catch (error) {
       const message = error instanceof Error ? error.message : t('txt_export_failed');
@@ -563,6 +560,7 @@ export default function ImportPage({ onImport, onImportEncryptedRaw, accountKeys
   }
 
   async function handleExportConfirmPassword() {
+    if (isExporting) return;
     const masterPassword = String(exportAuthPassword || '').trim();
     if (!masterPassword) {
       onNotify('error', t('txt_master_password_is_required'));
@@ -582,46 +580,10 @@ export default function ImportPage({ onImport, onImportEncryptedRaw, accountKeys
 
   return (
     <div className="import-export-page">
-      <section className="card import-export-hero">
-        <h3>{t('txt_import_export_title')}</h3>
-        <p className="import-export-hero-sub">{t('txt_import_export_feature_intro')}</p>
-        <div className="import-export-feature-grid">
-          <article className="import-export-feature-item">
-            <span className="import-export-feature-icon">
-              <Archive size={16} />
-            </span>
-            <div>
-              <strong>{t('txt_import_export_feature_bw_zip_title')}</strong>
-              <p>{t('txt_import_export_feature_bw_zip_desc')}</p>
-            </div>
-          </article>
-          <article className="import-export-feature-item">
-            <span className="import-export-feature-icon">
-              <FileJson size={16} />
-            </span>
-            <div>
-              <strong>{t('txt_import_export_feature_nodewarden_json_title')}</strong>
-              <p>{t('txt_import_export_feature_nodewarden_json_desc')}</p>
-            </div>
-          </article>
-          <article className="import-export-feature-item">
-            <span className="import-export-feature-icon">
-              <ArrowLeftRight size={16} />
-            </span>
-            <div>
-              <strong>{t('txt_import_export_feature_compat_title')}</strong>
-              <p>{t('txt_import_export_feature_compat_desc')}</p>
-            </div>
-          </article>
-        </div>
-      </section>
-
       <div className="import-export-panels">
       <section className="card import-export-panel">
         <h3>{t('txt_import')}</h3>
-        <p className="muted" style={{ textAlign: 'left', marginBottom: 12 }}>
-          {t('txt_import_vault_data_hint')}
-        </p>
+        <p className="backup-inline-note">{t('txt_import_vault_data_hint')}</p>
         <div className="field-grid">
           <label className="field field-span-2">
             <span>{t('txt_format')}</span>
@@ -702,9 +664,7 @@ export default function ImportPage({ onImport, onImportEncryptedRaw, accountKeys
 
       <section className="card import-export-panel">
         <h3>{t('txt_export')}</h3>
-        <p className="muted" style={{ textAlign: 'left', marginBottom: 12 }}>
-          {t('txt_export_vault_data_hint')}
-        </p>
+        <p className="backup-inline-note">{t('txt_export_vault_data_hint')}</p>
         <div className="field-grid">
           <label className="field field-span-2">
             <span>{t('txt_format')}</span>
@@ -779,6 +739,8 @@ export default function ImportPage({ onImport, onImportEncryptedRaw, accountKeys
         confirmText={isExporting ? t('txt_loading') : t('txt_verify')}
         cancelText={t('txt_cancel')}
         showIcon={false}
+        confirmDisabled={isExporting}
+        cancelDisabled={isExporting}
         onConfirm={() => void handleExportConfirmPassword()}
         onCancel={() => {
           if (isExporting) return;
@@ -804,6 +766,8 @@ export default function ImportPage({ onImport, onImportEncryptedRaw, accountKeys
         confirmText={isPasswordSubmitting ? t('txt_loading') : t('txt_import')}
         cancelText={t('txt_cancel')}
         showIcon={false}
+        confirmDisabled={isPasswordSubmitting}
+        cancelDisabled={isPasswordSubmitting}
         onConfirm={() => void handlePasswordImportConfirm()}
         onCancel={() => {
           if (isPasswordSubmitting) return;
@@ -830,6 +794,8 @@ export default function ImportPage({ onImport, onImportEncryptedRaw, accountKeys
         confirmText={isZipPasswordSubmitting ? t('txt_loading') : t('txt_import')}
         cancelText={t('txt_cancel')}
         showIcon={false}
+        confirmDisabled={isZipPasswordSubmitting}
+        cancelDisabled={isZipPasswordSubmitting}
         onConfirm={() => void handleZipPasswordImportConfirm()}
         onCancel={() => {
           if (isZipPasswordSubmitting) return;
@@ -849,9 +815,15 @@ export default function ImportPage({ onImport, onImportEncryptedRaw, accountKeys
         </label>
       </ConfirmDialog>
 
-      {importSummary && (
-        <div className="dialog-mask">
-          <section className="dialog-card import-summary-dialog">
+      {importSummary && typeof document !== 'undefined' ? createPortal((
+        <div
+          className="dialog-mask"
+          onClick={(event) => {
+            if (event.target !== event.currentTarget) return;
+            setImportSummary(null);
+          }}
+        >
+          <section className="dialog-card import-summary-dialog" role="dialog" aria-modal="true" aria-label={t('txt_import_success')}>
             <button
               type="button"
               className="import-summary-close"
@@ -862,6 +834,29 @@ export default function ImportPage({ onImport, onImportEncryptedRaw, accountKeys
             </button>
             <h3 className="dialog-title">{t('txt_import_success')}</h3>
             <div className="dialog-message">{t('txt_import_success_number_of_items', { count: importSummary.totalItems })}</div>
+            {importSummary.attachmentCount > 0 && (
+              <div className="dialog-message">
+                {t('txt_import_attachment_summary', {
+                  imported: String(importSummary.importedAttachmentCount),
+                  total: String(importSummary.attachmentCount),
+                })}
+              </div>
+            )}
+            {importSummary.failedAttachments.length > 0 && (
+              <div className="import-summary-failed-list">
+                <div className="import-summary-failed-title">
+                  {t('txt_import_failed_attachments_title', { count: String(importSummary.failedAttachments.length) })}
+                </div>
+                <ul>
+                  {importSummary.failedAttachments.map((row, index) => (
+                    <li key={`${row.fileName}-${index}`}>
+                      <strong>{row.fileName}</strong>
+                      {`: ${row.reason}`}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div className="import-summary-table-wrap">
               <table className="import-summary-table">
                 <thead>
@@ -889,7 +884,7 @@ export default function ImportPage({ onImport, onImportEncryptedRaw, accountKeys
             </button>
           </section>
         </div>
-      )}
+      ), document.body) : null}
     </div>
   );
 }

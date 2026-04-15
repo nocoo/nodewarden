@@ -7,6 +7,11 @@ import { StorageService } from './storage';
 // This second layer only needs to be non-trivial, not expensive.
 const SERVER_HASH_ITERATIONS = 100_000;
 
+export interface VerifiedAccessContext {
+  payload: JWTPayload;
+  user: User;
+}
+
 export class AuthService {
   private storage: StorageService;
 
@@ -61,27 +66,27 @@ export class AuthService {
   }
 
   // Generate access token
-  async generateAccessToken(user: User): Promise<string> {
+  async generateAccessToken(user: User, device?: { identifier: string; sessionStamp: string } | null): Promise<string> {
     return createJWT(
       {
         sub: user.id,
         email: user.email,
         name: user.name,
         sstamp: user.securityStamp,
+        ...(device?.identifier ? { did: device.identifier, dstamp: device.sessionStamp } : {}),
       },
       this.env.JWT_SECRET
     );
   }
 
   // Generate refresh token
-  async generateRefreshToken(userId: string): Promise<string> {
+  async generateRefreshToken(userId: string, device?: { identifier: string; sessionStamp: string } | null): Promise<string> {
     const token = createRefreshToken();
-    await this.storage.saveRefreshToken(token, userId);
+    await this.storage.saveRefreshToken(token, userId, undefined, device?.identifier ?? null, device?.sessionStamp ?? null);
     return token;
   }
 
-  // Verify access token from Authorization header
-  async verifyAccessToken(authHeader: string | null): Promise<JWTPayload | null> {
+  async verifyAccessTokenWithUser(authHeader: string | null): Promise<VerifiedAccessContext | null> {
     if (!authHeader) return null;
 
     const parts = authHeader.split(' ');
@@ -92,30 +97,57 @@ export class AuthService {
     const payload = await verifyJWT(parts[1], this.env.JWT_SECRET);
     if (!payload) return null;
 
-    // Verify security stamp - ensures token is invalidated after password change
     const user = await this.storage.getUserById(payload.sub);
     if (!user) return null;
-    
+
     if (payload.sstamp !== user.securityStamp) {
-      return null; // Token was issued before password change
+      return null;
     }
 
-    return payload;
+    if (payload.did) {
+      const device = await this.storage.getDevice(user.id, payload.did);
+      if (!device) return null;
+      if (!payload.dstamp || payload.dstamp !== device.sessionStamp) return null;
+    }
+
+    return { payload, user };
+  }
+
+  // Verify access token from Authorization header
+  async verifyAccessToken(authHeader: string | null): Promise<JWTPayload | null> {
+    const verified = await this.verifyAccessTokenWithUser(authHeader);
+    return verified?.payload ?? null;
   }
 
   // Refresh access token
-  async refreshAccessToken(refreshToken: string): Promise<{ accessToken: string; user: User } | null> {
-    const userId = await this.storage.getRefreshTokenUserId(refreshToken);
-    if (!userId) return null;
+  async refreshAccessToken(
+    refreshToken: string
+  ): Promise<{ accessToken: string; user: User; device: { identifier: string; sessionStamp: string } | null } | null> {
+    const record = await this.storage.getRefreshTokenRecord(refreshToken);
+    if (!record?.userId) return null;
 
-    const user = await this.storage.getUserById(userId);
+    const user = await this.storage.getUserById(record.userId);
     if (!user) return null;
     if (user.status !== 'active') {
       await this.storage.deleteRefreshToken(refreshToken);
       return null;
     }
 
-    const accessToken = await this.generateAccessToken(user);
-    return { accessToken, user };
+    let device: { identifier: string; sessionStamp: string } | null = null;
+    if (record.deviceIdentifier) {
+      const boundDevice = await this.storage.getDevice(user.id, record.deviceIdentifier);
+      if (!boundDevice) {
+        await this.storage.deleteRefreshToken(refreshToken);
+        return null;
+      }
+      if (!record.deviceSessionStamp || boundDevice.sessionStamp !== record.deviceSessionStamp) {
+        await this.storage.deleteRefreshToken(refreshToken);
+        return null;
+      }
+      device = { identifier: boundDevice.deviceIdentifier, sessionStamp: boundDevice.sessionStamp };
+    }
+
+    const accessToken = await this.generateAccessToken(user, device);
+    return { accessToken, user, device };
   }
 }

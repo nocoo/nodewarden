@@ -3,7 +3,16 @@ const TOTP_DIGITS = 6;
 const TOTP_WINDOW = 1; // allow previous/current/next step for small clock drift
 
 function normalizeBase32(input: string): string {
-  return input.toUpperCase().replace(/[\s-]/g, '').replace(/=+$/g, '');
+  const raw = String(input || '').toUpperCase();
+  let out = '';
+  for (const char of raw) {
+    if (char === ' ' || char === '\t' || char === '\n' || char === '\r' || char === '-') continue;
+    out += char;
+  }
+  while (out.endsWith('=')) {
+    out = out.slice(0, -1);
+  }
+  return out;
 }
 
 function base32Decode(input: string): Uint8Array | null {

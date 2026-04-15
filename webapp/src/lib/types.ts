@@ -1,9 +1,10 @@
-export type AppPhase = 'loading' | 'register' | 'login' | 'locked' | 'app';
+export type AppPhase = 'register' | 'login' | 'locked' | 'app';
 
 export interface SessionState {
-  accessToken: string;
-  refreshToken: string;
+  accessToken?: string;
+  refreshToken?: string;
   email: string;
+  authMode?: 'token' | 'web-cookie';
   symEncKey?: string;
   symMacKey?: string;
 }
@@ -13,6 +14,9 @@ export interface Profile {
   email: string;
   name: string;
   key: string;
+  masterPasswordHint?: string | null;
+  privateKey?: string | null;
+  publicKey?: string | null;
   role: 'admin' | 'user';
   [k: string]: unknown;
 }
@@ -25,7 +29,13 @@ export interface Folder {
 
 export interface CipherLoginUri {
   uri?: string | null;
+  match?: number | null;
   decUri?: string;
+}
+
+export interface VaultDraftLoginUri {
+  uri: string;
+  match: number | null;
 }
 
 export interface CipherAttachment {
@@ -140,6 +150,7 @@ export interface Cipher {
   creationDate?: string;
   revisionDate?: string;
   deletedDate?: string | null;
+  archivedDate?: string | null;
   attachments?: CipherAttachment[] | null;
   login?: CipherLogin | null;
   card?: CipherCard | null;
@@ -217,7 +228,7 @@ export interface VaultDraft {
   loginUsername: string;
   loginPassword: string;
   loginTotp: string;
-  loginUris: string[];
+  loginUris: VaultDraftLoginUri[];
   loginFido2Credentials: Array<Record<string, unknown>>;
   cardholderName: string;
   cardNumber: string;
@@ -254,11 +265,7 @@ export interface ListResponse<T> {
   data: T[];
 }
 
-export interface SetupStatusResponse {
-  registered: boolean;
-}
-
-export interface WebConfigResponse {
+export interface WebBootstrapResponse {
   defaultKdfIterations?: number;
   jwtUnsafeReason?: 'missing' | 'default' | 'too_short' | null;
   jwtSecretMinLength?: number;
@@ -266,8 +273,29 @@ export interface WebConfigResponse {
 
 export interface TokenSuccess {
   access_token: string;
-  refresh_token: string;
+  refresh_token?: string;
+  web_session?: boolean;
+  expires_in?: number;
+  token_type?: string;
   TwoFactorToken?: string;
+  Key?: string;
+  PrivateKey?: string | null;
+  AccountKeys?: unknown | null;
+  accountKeys?: unknown | null;
+  Kdf?: number;
+  KdfIterations?: number;
+  KdfMemory?: number | null;
+  KdfParallelism?: number | null;
+  ForcePasswordReset?: boolean;
+  ResetMasterPassword?: boolean;
+  scope?: string;
+  unofficialServer?: boolean;
+  UserDecryptionOptions?: unknown;
+  userDecryptionOptions?: unknown;
+  VaultKeys?: {
+    symEncKey?: string;
+    symMacKey?: string;
+  };
 }
 
 export interface TokenError {
@@ -278,7 +306,7 @@ export interface TokenError {
 
 export interface ToastMessage {
   id: string;
-  type: 'success' | 'error';
+  type: 'success' | 'error' | 'warning';
   text: string;
 }
 
@@ -304,6 +332,7 @@ export interface AuthorizedDevice {
   type: number;
   creationDate: string | null;
   revisionDate: string | null;
+  online: boolean;
   trusted: boolean;
   trustedTokenCount: number;
   trustedUntil: string | null;
