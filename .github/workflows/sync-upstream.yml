@@ -25,6 +25,10 @@ jobs:
           git checkout upstream/main -- .
           git checkout HEAD -- .github/workflows/
 
+          # Configure git identity for the commit
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
           # Commit and push if there are changes
           git add -A
           if git diff --cached --quiet; then
