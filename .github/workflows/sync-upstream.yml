@@ -21,9 +21,22 @@ jobs:
           git remote add upstream https://github.com/shuaiplus/nodewarden.git || true
           git fetch upstream
 
-          # Get all files from upstream except .github/workflows/
+          # Sync all files from upstream EXCEPT .github/workflows/
+          # (GITHUB_TOKEN lacks 'workflows' permission — any workflow file
+          # changes cause push to fail with "refusing to allow a GitHub App
+          # to create or update workflow")
           git checkout upstream/main -- .
           git checkout HEAD -- .github/workflows/
+          # Remove any NEW workflow files added by upstream (checkout HEAD
+          # only restores files that already exist in our HEAD)
+          git diff --cached --name-only --diff-filter=A -- .github/workflows/ | while read -r f; do
+            git rm -f "$f" 2>/dev/null || true
+            rm -f "$f"
+          done
+
+          # Configure git identity for the commit
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
           # Commit and push if there are changes
           git add -A
