@@ -313,8 +313,8 @@
 
 .list-item:hover {
   background: #fcfdff;
-  border-color: rgba(148, 163, 184, 0.26);
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
+  border-color: rgba(37, 99, 235, 0.18);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(37, 99, 235, 0.04);
 }
 
 .list-item:hover::before {
@@ -470,23 +470,21 @@
 }
 
 .detail-col > .card {
-  @apply opacity-100;
-  animation: none;
+  animation: surface-enter 280ms var(--ease-out-soft) both;
 }
 
 .detail-col > .card:nth-of-type(1) { animation-delay: 0ms; }
-.detail-col > .card:nth-of-type(2) { animation-delay: 0ms; }
-.detail-col > .card:nth-of-type(3) { animation-delay: 0ms; }
-.detail-col > .card:nth-of-type(4) { animation-delay: 0ms; }
-.detail-col > .card:nth-of-type(5) { animation-delay: 0ms; }
+.detail-col > .card:nth-of-type(2) { animation-delay: 40ms; }
+.detail-col > .card:nth-of-type(3) { animation-delay: 80ms; }
+.detail-col > .card:nth-of-type(4) { animation-delay: 120ms; }
+.detail-col > .card:nth-of-type(5) { animation-delay: 160ms; }
 
 .detail-switch-stage {
-  animation: none;
+  animation: fade-in 160ms var(--ease-out-soft) both;
 }
 
 .detail-switch-stage > .card {
-  @apply opacity-100;
-  animation: none;
+  animation: surface-enter 280ms var(--ease-out-soft) both;
 }
 
 .card h4 {
