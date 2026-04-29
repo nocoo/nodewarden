@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useMemo } from 'preact/hooks';
 import {
   CreditCard,
   FileKey2,
@@ -10,6 +10,7 @@ import {
 import { copyTextToClipboard } from '@/lib/clipboard';
 import { t } from '@/lib/i18n';
 import type { Cipher, CipherAttachment, CustomFieldType, VaultDraft, VaultDraftField, VaultDraftLoginUri } from '@/lib/types';
+import WebsiteIcon from './WebsiteIcon';
 
 export type TypeFilter = 'login' | 'card' | 'identity' | 'note' | 'ssh';
 export type VaultSortMode = 'edited' | 'created' | 'name';
@@ -147,28 +148,7 @@ export function toBooleanFieldValue(raw: string): boolean {
   return v === '1' || v === 'true' || v === 'yes' || v === 'on';
 }
 
-export function firstCipherUri(cipher: Cipher): string {
-  const uris = cipher.login?.uris || [];
-  for (const uri of uris) {
-    const raw = uri.decUri || uri.uri || '';
-    if (raw.trim()) return raw.trim();
-  }
-  return '';
-}
-
-export function hostFromUri(uri: string): string {
-  if (!uri.trim()) return '';
-  try {
-    const normalized = /^https?:\/\//i.test(uri) ? uri : `https://${uri}`;
-    return new URL(normalized).hostname || '';
-  } catch {
-    return '';
-  }
-}
-
-export function websiteIconUrl(host: string): string {
-  return `/icons/${encodeURIComponent(host)}/icon.png?fallback=404`;
-}
+export { firstCipherUri, hostFromUri, websiteIconUrl } from '@/lib/website-utils';
 
 export function createEmptyLoginUri(): VaultDraftLoginUri {
   return { uri: '', match: null, originalUri: '', extra: {} };
@@ -433,110 +413,8 @@ export function firstPasskeyCreationTime(cipher: Cipher | null): string | null {
   return null;
 }
 
-const failedIconHosts = new Set<string>();
-const loadedIconHosts = new Set<string>();
-const ICON_LOAD_ROOT_MARGIN = '180px 0px';
-
 export function VaultListIcon({ cipher }: { cipher: Cipher }) {
-  const host = useMemo(() => hostFromUri(firstCipherUri(cipher)), [cipher]);
-  const iconStackRef = useRef<HTMLSpanElement | null>(null);
-  const [errored, setErrored] = useState(() => (host ? failedIconHosts.has(host) : false));
-  const [shouldLoad, setShouldLoad] = useState(() => {
-    if (!host) return true;
-    if (loadedIconHosts.has(host)) return true;
-    return false;
-  });
-  const markIconError = () => {
-    if (host) {
-      failedIconHosts.add(host);
-      loadedIconHosts.delete(host);
-    }
-    setErrored(true);
-  };
-  const hideFallback = () => {
-    if (host) loadedIconHosts.add(host);
-    const stack = iconStackRef.current;
-    if (stack) {
-      const fallback = stack.querySelector('.list-icon-fallback') as HTMLElement | null;
-      if (fallback) fallback.style.display = 'none';
-    }
-  };
-  const handleImgRef = (img: HTMLImageElement | null) => {
-    if (!img || !img.complete) return;
-    if (img.naturalWidth > 0) hideFallback();
-  };
-
-  useEffect(() => {
-    if (!host) {
-      setErrored(false);
-      setShouldLoad(true);
-    } else if (failedIconHosts.has(host)) {
-      setErrored(true);
-      setShouldLoad(false);
-    } else {
-      setErrored(false);
-      setShouldLoad(loadedIconHosts.has(host));
-    }
-    const fallback = iconStackRef.current?.querySelector('.list-icon-fallback') as HTMLElement | null;
-    if (fallback) fallback.style.display = '';
-  }, [host]);
-
-  useEffect(() => {
-    if (!host || errored || shouldLoad) return;
-    const node = iconStackRef.current;
-    if (!node) return;
-    if (typeof IntersectionObserver !== 'function') {
-      setShouldLoad(true);
-      return;
-    }
-
-    let cancelled = false;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (!entry.isIntersecting && entry.intersectionRatio <= 0) continue;
-          if (!cancelled) setShouldLoad(true);
-          observer.disconnect();
-          break;
-        }
-      },
-      { rootMargin: ICON_LOAD_ROOT_MARGIN }
-    );
-
-    observer.observe(node);
-    return () => {
-      cancelled = true;
-      observer.disconnect();
-    };
-  }, [host, errored, shouldLoad]);
-
-  if (host && !errored) {
-    return (
-      <span className="list-icon-stack" ref={iconStackRef}>
-        <span className="list-icon-fallback">
-          <Globe size={18} />
-        </span>
-        {shouldLoad && (
-          <img
-            className="list-icon loaded"
-            src={websiteIconUrl(host)}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            referrerPolicy="no-referrer"
-            ref={handleImgRef}
-            onLoad={hideFallback}
-            onError={markIconError}
-          />
-        )}
-      </span>
-    );
-  }
-  return (
-    <span className="list-icon-fallback">
-      <TypeIcon type={Number(cipher.type || 1)} />
-    </span>
-  );
+  return <WebsiteIcon cipher={cipher} fallback={<TypeIcon type={Number(cipher.type || 1)} />} />;
 }
 
 export function copyToClipboard(value: string): void {

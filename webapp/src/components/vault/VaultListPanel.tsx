@@ -2,6 +2,7 @@ import type { RefObject } from 'preact';
 import { memo } from 'preact/compat';
 import { createPortal } from 'preact/compat';
 import { Archive, ArrowUpDown, Check, CheckCheck, FolderInput, Plus, RefreshCw, RotateCcw, Trash2, X } from 'lucide-preact';
+import LoadingState from '@/components/LoadingState';
 import type { Cipher } from '@/lib/types';
 import { t } from '@/lib/i18n';
 import {
@@ -234,6 +235,7 @@ export default function VaultListPanel(props: VaultListPanelProps) {
       </div>
 
       <div className="list-panel" ref={props.listPanelRef} onScroll={(event) => props.onScroll((event.currentTarget as HTMLDivElement).scrollTop)}>
+        {props.loading && !props.filteredCiphers.length && <LoadingState lines={7} compact />}
         {!!props.filteredCiphers.length && (
           <div style={{ paddingTop: `${props.virtualRange.padTop}px`, paddingBottom: `${props.virtualRange.padBottom}px` }}>
             {props.visibleCiphers.map((cipher) => (
@@ -249,7 +251,7 @@ export default function VaultListPanel(props: VaultListPanelProps) {
             ))}
           </div>
         )}
-        {!props.filteredCiphers.length && <div className="empty">{t('txt_no_items')}</div>}
+        {!props.loading && !props.filteredCiphers.length && <div className="empty">{t('txt_no_items')}</div>}
       </div>
     </section>
   );
