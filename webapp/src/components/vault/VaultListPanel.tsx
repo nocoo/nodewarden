@@ -6,9 +6,9 @@ import LoadingState from '@/components/LoadingState';
 import type { Cipher } from '@/lib/types';
 import { t } from '@/lib/i18n';
 import {
-  CREATE_TYPE_OPTIONS,
   CreateTypeIcon,
-  VAULT_SORT_OPTIONS,
+  getCreateTypeOptions,
+  getVaultSortOptions,
   VaultListIcon,
   type SidebarFilter,
   type VaultSortMode,
@@ -106,6 +106,8 @@ const CipherListItem = memo(function CipherListItem(props: CipherListItemProps) 
 });
 
 export default function VaultListPanel(props: VaultListPanelProps) {
+  const createTypeOptions = getCreateTypeOptions();
+  const vaultSortOptions = getVaultSortOptions();
   const createMenu = (
     <div className="create-menu-wrap mobile-fab-wrap" ref={props.createMenuRef}>
       <button
@@ -119,7 +121,7 @@ export default function VaultListPanel(props: VaultListPanelProps) {
       </button>
       {props.createMenuOpen && (
         <div className="create-menu">
-          {CREATE_TYPE_OPTIONS.map((option) => (
+          {createTypeOptions.map((option) => (
             <button key={option.type} type="button" className="create-menu-item" onClick={() => props.onStartCreate(option.type)}>
               <CreateTypeIcon type={option.type} />
               <span>{option.label}</span>
@@ -171,7 +173,7 @@ export default function VaultListPanel(props: VaultListPanelProps) {
           </button>
           {props.sortMenuOpen && (
             <div className="sort-menu">
-              {VAULT_SORT_OPTIONS.map((option) => (
+              {vaultSortOptions.map((option) => (
                 <button
                   key={option.value}
                   type="button"

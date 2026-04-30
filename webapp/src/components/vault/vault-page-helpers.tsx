@@ -28,45 +28,56 @@ interface TypeOption {
   label: string;
 }
 
-export const CREATE_TYPE_OPTIONS: TypeOption[] = [
-  { type: 1, label: t('txt_login') },
-  { type: 3, label: t('txt_card') },
-  { type: 4, label: t('txt_identity') },
-  { type: 2, label: t('txt_note') },
-  { type: 5, label: t('txt_ssh_key') },
-];
+export function getCreateTypeOptions(): TypeOption[] {
+  return [
+    { type: 1, label: t('txt_login') },
+    { type: 3, label: t('txt_card') },
+    { type: 4, label: t('txt_identity') },
+    { type: 2, label: t('txt_note') },
+    { type: 5, label: t('txt_ssh_key') },
+  ];
+}
 
 export const VAULT_SORT_STORAGE_KEY = 'nodewarden.vault.sort.v1';
 export const FOLDER_SORT_STORAGE_KEY = 'nodewarden.folder-sort.v1';
 export const MOBILE_LAYOUT_QUERY = '(max-width: 1180px)';
 export const VAULT_LIST_ROW_HEIGHT = 74;
 export const VAULT_LIST_OVERSCAN = 10;
-export const VAULT_SORT_OPTIONS: Array<{ value: VaultSortMode; label: string }> = [
-  { value: 'edited', label: t('txt_sort_last_edited') },
-  { value: 'created', label: t('txt_sort_created') },
-  { value: 'name', label: t('txt_sort_name') },
-];
-export const FOLDER_SORT_OPTIONS: Array<{ value: VaultSortMode; label: string }> = [
-  { value: 'edited', label: t('txt_sort_last_edited') },
-  { value: 'created', label: t('txt_sort_created') },
-  { value: 'name', label: t('txt_sort_name') },
-];
+export function getVaultSortOptions(): Array<{ value: VaultSortMode; label: string }> {
+  return [
+    { value: 'edited', label: t('txt_sort_last_edited') },
+    { value: 'created', label: t('txt_sort_created') },
+    { value: 'name', label: t('txt_sort_name') },
+  ];
+}
 
-export const FIELD_TYPE_OPTIONS: Array<{ value: CustomFieldType; label: string }> = [
-  { value: 0, label: t('txt_text') },
-  { value: 1, label: t('txt_hidden') },
-  { value: 2, label: t('txt_boolean') },
-];
+export function getFolderSortOptions(): Array<{ value: VaultSortMode; label: string }> {
+  return [
+    { value: 'edited', label: t('txt_sort_last_edited') },
+    { value: 'created', label: t('txt_sort_created') },
+    { value: 'name', label: t('txt_sort_name') },
+  ];
+}
 
-export const WEBSITE_MATCH_OPTIONS: Array<{ value: number | null; label: string }> = [
-  { value: null, label: t('txt_uri_match_default_base_domain') },
-  { value: 0, label: t('txt_uri_match_base_domain') },
-  { value: 1, label: t('txt_uri_match_host') },
-  { value: 3, label: t('txt_uri_match_exact') },
-  { value: 5, label: t('txt_uri_match_never') },
-  { value: 2, label: t('txt_uri_match_starts_with') },
-  { value: 4, label: t('txt_uri_match_regular_expression') },
-];
+export function getFieldTypeOptions(): Array<{ value: CustomFieldType; label: string }> {
+  return [
+    { value: 0, label: t('txt_text') },
+    { value: 1, label: t('txt_hidden') },
+    { value: 2, label: t('txt_boolean') },
+  ];
+}
+
+export function getWebsiteMatchOptions(): Array<{ value: number | null; label: string }> {
+  return [
+    { value: null, label: t('txt_uri_match_default_base_domain') },
+    { value: 0, label: t('txt_uri_match_base_domain') },
+    { value: 1, label: t('txt_uri_match_host') },
+    { value: 3, label: t('txt_uri_match_exact') },
+    { value: 5, label: t('txt_uri_match_never') },
+    { value: 2, label: t('txt_uri_match_starts_with') },
+    { value: 4, label: t('txt_uri_match_regular_expression') },
+  ];
+}
 
 export const TOTP_PERIOD_SECONDS = 30;
 export const TOTP_RING_RADIUS = 14;
@@ -156,7 +167,7 @@ export function createEmptyLoginUri(): VaultDraftLoginUri {
 
 export function websiteMatchLabel(value: number | null | undefined): string {
   const normalized = typeof value === 'number' && Number.isFinite(value) ? value : null;
-  return WEBSITE_MATCH_OPTIONS.find((option) => option.value === normalized)?.label || t('txt_uri_match_default_base_domain');
+  return getWebsiteMatchOptions().find((option) => option.value === normalized)?.label || t('txt_uri_match_default_base_domain');
 }
 
 function valueOrFallback(value: string | null | undefined): string {

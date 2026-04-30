@@ -134,7 +134,28 @@ export function loadProfileSnapshot(email?: string | null): Profile | null {
 
 export function saveProfileSnapshot(profile: Profile | null): void {
   if (!profile) return;
-  localStorage.setItem(PROFILE_SNAPSHOT_KEY, JSON.stringify(stripProfileSecrets(profile)));
+  const nextSnapshot = stripProfileSecrets(profile);
+  try {
+    const rawExisting = localStorage.getItem(PROFILE_SNAPSHOT_KEY);
+    if (rawExisting) {
+      const existing = stripProfileSecrets(JSON.parse(rawExisting) as Profile);
+      if (
+        existing
+        && existing.email === nextSnapshot?.email
+        && existing.role === 'admin'
+        && nextSnapshot?.role !== 'admin'
+      ) {
+        localStorage.setItem(PROFILE_SNAPSHOT_KEY, JSON.stringify({
+          ...nextSnapshot,
+          role: 'admin',
+        }));
+        return;
+      }
+    }
+  } catch {
+    // Fall back to writing the normalized snapshot below.
+  }
+  localStorage.setItem(PROFILE_SNAPSHOT_KEY, JSON.stringify(nextSnapshot));
 }
 
 export function clearProfileSnapshot(): void {
