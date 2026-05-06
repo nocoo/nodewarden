@@ -909,6 +909,8 @@ export function createDemoMainRoutesProps(base: AppMainRoutesProps, notify: Noti
     authorizedDevices: state.authorizedDevices,
     authorizedDevicesLoading: false,
     authorizedDevicesError: '',
+    domainRulesLoading: false,
+    domainRulesError: '',
     onImport: async () => {
       await readonly();
       return createDemoImportResult();
@@ -1055,6 +1057,10 @@ export function createDemoMainRoutesProps(base: AppMainRoutesProps, notify: Noti
     onRefreshAuthorizedDevices: async () => {
       notify('success', t('txt_demo_devices_refreshed'));
     },
+    onRefreshDomainRules: () => {
+      notify('success', t('txt_domain_rules_refreshed'));
+    },
+    onSaveDomainRules: readonly,
     onRenameAuthorizedDevice: async (device, name) => {
       const normalized = String(name || '').trim();
       if (!normalized) {

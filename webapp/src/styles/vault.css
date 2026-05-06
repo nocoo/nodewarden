@@ -5,7 +5,8 @@
 
 .sidebar,
 .list-panel,
-.card {
+.card,
+.detail-col {
   @apply rounded-2xl border bg-panel shadow-soft;
   border-color: var(--line);
 }
@@ -483,7 +484,7 @@
 }
 
 .detail-col {
-  @apply min-h-0 overflow-auto;
+  @apply min-h-0 overflow-auto p-2;
 }
 
 .mobile-panel-head {

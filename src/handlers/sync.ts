@@ -9,6 +9,7 @@ import {
   buildUserDecryptionCompat,
   buildUserDecryptionOptions,
 } from '../utils/user-decryption';
+import { buildDomainsResponse } from '../services/domain-rules';
 
 function buildSyncCacheRequest(request: Request, userId: string, revisionDate: string, excludeDomains: boolean, excludeSends: boolean): Request {
   const url = new URL(request.url);
@@ -50,11 +51,12 @@ export async function handleSync(request: Request, env: Env, userId: string): Pr
     return cachedResponse;
   }
 
-  const [ciphers, folders, sends, attachmentsByCipher] = await Promise.all([
+  const [ciphers, folders, sends, attachmentsByCipher, domainSettings] = await Promise.all([
     storage.getAllCiphers(userId),
     storage.getAllFolders(userId),
     excludeSends ? Promise.resolve([]) : storage.getAllSends(userId),
     storage.getAttachmentsByUserId(userId),
+    excludeDomains ? Promise.resolve(null) : storage.getUserDomainSettings(userId),
   ]);
   const accountKeys = buildAccountKeys(user);
   const userDecryptionOptions = buildUserDecryptionOptions(user);
@@ -111,11 +113,12 @@ export async function handleSync(request: Request, env: Env, userId: string): Pr
     ciphers: cipherResponses,
     domains: excludeDomains
       ? null
-      : {
-          equivalentDomains: [],
-          globalEquivalentDomains: [],
-          object: 'domains',
-        },
+      : buildDomainsResponse(
+          domainSettings?.equivalentDomains || [],
+          domainSettings?.customEquivalentDomains || [],
+          domainSettings?.excludedGlobalEquivalentDomains || [],
+          { omitExcludedGlobals: true }
+        ),
     policies: [],
     sends: sendResponses,
     UserDecryption: {

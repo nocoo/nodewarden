@@ -23,6 +23,7 @@ import {
   stripProfileSecrets,
 } from '@/lib/api/auth';
 import { listAdminInvites, listAdminUsers } from '@/lib/api/admin';
+import { getDomainRules, saveDomainRules } from '@/lib/api/domains';
 import { getSends } from '@/lib/api/send';
 import { getCachedVaultCoreSnapshot, loadVaultCoreSyncSnapshot } from '@/lib/api/vault-sync';
 import { silentlyRepairBackupSettingsIfNeeded } from '@/lib/backup-settings-repair';
@@ -68,7 +69,7 @@ import {
   createDemoMainRoutesProps,
 } from '@/lib/demo';
 import type { AdminBackupSettings } from '@/lib/api/backup';
-import type { AdminInvite, AdminUser, AppPhase, AuthorizedDevice, Cipher, Folder as VaultFolder, Profile, Send, SessionState } from '@/lib/types';
+import type { AdminInvite, AdminUser, AppPhase, AuthorizedDevice, Cipher, CustomEquivalentDomain, DomainRules, Folder as VaultFolder, Profile, Send, SessionState } from '@/lib/types';
 import type { VaultCoreSnapshot } from '@/lib/vault-cache';
 
 function isBackupProgressDetail(value: unknown): value is BackupProgressDetail {
@@ -87,6 +88,7 @@ const IMPORT_ROUTE_PATHS = [IMPORT_ROUTE, '/tools/import', '/tools/import-export
 const IMPORT_ROUTE_ALIASES: ReadonlySet<string> = new Set(IMPORT_ROUTE_PATHS.filter((path) => path !== IMPORT_ROUTE));
 const SETTINGS_HOME_ROUTE = '/settings';
 const SETTINGS_ACCOUNT_ROUTE = '/settings/account';
+const SETTINGS_DOMAIN_RULES_ROUTE = '/settings/domain-rules';
 const AUTH_ROUTE_PATHS = ['/', '/login', '/register', '/lock', '/recover-2fa'] as const;
 const APP_ROUTE_PATHS = [
   '/',
@@ -98,6 +100,7 @@ const APP_ROUTE_PATHS = [
   '/backup',
   '/settings',
   SETTINGS_ACCOUNT_ROUTE,
+  SETTINGS_DOMAIN_RULES_ROUTE,
   '/help',
   ...IMPORT_ROUTE_PATHS,
 ] as const;
@@ -227,6 +230,7 @@ export default function App() {
   const pendingVaultCoreQueryRefreshRef = useRef<Promise<{ data?: VaultCoreSnapshot } | unknown> | null>(null);
   const pendingVaultCoreRefreshRef = useRef<Promise<unknown> | null>(null);
   const notificationRefreshTimerRef = useRef<number | null>(null);
+  const domainRulesSaveSeqRef = useRef(0);
   const { toasts, pushToast, removeToast } = useToastManager();
 
   useEffect(() => {
@@ -953,6 +957,45 @@ export default function App() {
     enabled: !IS_DEMO_MODE && phase === 'app' && !!session?.accessToken && vaultInitialDecryptDone,
     staleTime: 30_000,
   });
+  const domainRulesQueryKey = useMemo(() => ['domain-rules', vaultCacheKey || session?.email] as const, [vaultCacheKey, session?.email]);
+  const domainRulesQuery = useQuery({
+    queryKey: domainRulesQueryKey,
+    queryFn: () => getDomainRules(authedFetch),
+    enabled: !IS_DEMO_MODE && phase === 'app' && !!session?.accessToken && vaultInitialDecryptDone && location === SETTINGS_DOMAIN_RULES_ROUTE,
+    staleTime: 30_000,
+  });
+  function handleSaveDomainRules(customEquivalentDomains: CustomEquivalentDomain[], excludedGlobalEquivalentDomains: number[]): Promise<void> {
+    const equivalentDomains = customEquivalentDomains.filter((rule) => !rule.excluded).map((rule) => rule.domains);
+    const excludedGlobalTypes = new Set(excludedGlobalEquivalentDomains);
+    const currentRules = queryClient.getQueryData<DomainRules>(domainRulesQueryKey) || domainRulesQuery.data;
+    const optimisticRules: DomainRules = {
+      object: 'domains',
+      equivalentDomains,
+      customEquivalentDomains,
+      globalEquivalentDomains: (currentRules?.globalEquivalentDomains || []).map((rule) => ({
+        ...rule,
+        excluded: excludedGlobalTypes.has(rule.type),
+      })),
+    };
+    const saveSeq = ++domainRulesSaveSeqRef.current;
+    queryClient.setQueryData(domainRulesQueryKey, optimisticRules);
+
+    void saveDomainRules(authedFetch, {
+      customEquivalentDomains,
+      equivalentDomains,
+      excludedGlobalEquivalentDomains,
+    }).then((updated) => {
+      if (domainRulesSaveSeqRef.current !== saveSeq) return;
+      queryClient.setQueryData(domainRulesQueryKey, updated);
+      void queryClient.invalidateQueries({ queryKey: ['vault-core', vaultCacheKey] });
+    }).catch((error) => {
+      if (domainRulesSaveSeqRef.current !== saveSeq) return;
+      pushToast('error', error instanceof Error ? error.message : t('txt_domain_rules_save_failed'));
+      void domainRulesQuery.refetch();
+    });
+
+    return Promise.resolve();
+  }
   useQuery({
     queryKey: ['admin-backup-settings', vaultCacheKey],
     queryFn: () => backupActions.loadSettings(),
@@ -1317,6 +1360,23 @@ export default function App() {
   const isImportRoute = routeLocation === IMPORT_ROUTE || IMPORT_ROUTE_ALIASES.has(routeLocation);
   const showSidebarToggle = mobileLayout && (location === '/vault' || location === '/sends');
   const sidebarToggleTitle = location === '/vault' ? t('txt_folders') : t('txt_type');
+  const demoDomainRules = useMemo<DomainRules>(() => ({
+    equivalentDomains: [
+      ['nodewarden.example', 'nw.example'],
+      ['staging.nodewarden.example', 'preview.nodewarden.example'],
+    ],
+    customEquivalentDomains: [
+      { id: 'demo-custom-1', domains: ['nodewarden.example', 'nw.example'], excluded: false },
+      { id: 'demo-custom-2', domains: ['staging.nodewarden.example', 'preview.nodewarden.example'], excluded: false },
+    ],
+    globalEquivalentDomains: [
+      { type: 0, domains: ['youtube.com', 'google.com', 'gmail.com'], excluded: false },
+      { type: 1, domains: ['apple.com', 'icloud.com'], excluded: false },
+      { type: 10, domains: ['microsoft.com', 'office.com', 'xbox.com'], excluded: true },
+      { type: -10001, domains: ['nodewarden.example', 'nw.example'], excluded: false },
+    ],
+    object: 'domains',
+  }), []);
   const mobilePrimaryRoute =
     location === '/sends'
       ? '/sends'
@@ -1330,6 +1390,7 @@ export default function App() {
     if (location === '/sends') return t('nav_sends');
     if (location === '/admin') return t('nav_admin_panel');
     if (location === '/security/devices') return t('nav_device_management');
+    if (location === SETTINGS_DOMAIN_RULES_ROUTE) return t('nav_domain_rules');
     if (location === '/backup') return t('nav_backup_strategy');
     if (isImportRoute) return t('nav_import_export');
     if (location === SETTINGS_ACCOUNT_ROUTE) return t('nav_account_settings');
@@ -1385,6 +1446,9 @@ export default function App() {
     authorizedDevices: authorizedDevicesQuery.data || [],
     authorizedDevicesLoading: authorizedDevicesQuery.isFetching,
     authorizedDevicesError: authorizedDevicesQuery.isError && !authorizedDevicesQuery.data ? t('txt_load_devices_failed') : '',
+    domainRules: IS_DEMO_MODE ? demoDomainRules : domainRulesQuery.data || null,
+    domainRulesLoading: domainRulesQuery.isFetching && !domainRulesQuery.data,
+    domainRulesError: domainRulesQuery.isError && !domainRulesQuery.data ? t('txt_domain_rules_load_failed') : '',
     onNavigate: navigate,
     onLogout: handleLogout,
     onNotify: pushToast,
@@ -1432,6 +1496,10 @@ export default function App() {
     onLockTimeoutChange: setLockTimeoutMinutes,
     onSessionTimeoutActionChange: setSessionTimeoutAction,
     onRefreshAuthorizedDevices: accountSecurityActions.refreshAuthorizedDevices,
+    onRefreshDomainRules: () => {
+      void domainRulesQuery.refetch();
+    },
+    onSaveDomainRules: handleSaveDomainRules,
     onRenameAuthorizedDevice: accountSecurityActions.renameAuthorizedDevice,
     onRevokeDeviceTrust: accountSecurityActions.openRevokeDeviceTrust,
     onRemoveDevice: accountSecurityActions.openRemoveDevice,

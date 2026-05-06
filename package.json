@@ -12,6 +12,7 @@
     "dev:demo": "vite --config webapp/vite.config.ts --mode demo --host 127.0.0.1 --port 5174",
     "build": "vite build --config webapp/vite.config.ts",
     "build:demo": "vite build --config webapp/vite.config.ts --mode demo && node scripts/pages-spa-redirects.cjs",
+    "domains:sync": "node scripts/sync-global-domains.mjs",
     "i18n": "node scripts/i18n-validate.cjs",
     "i18n:validate": "node scripts/i18n-validate.cjs",
     "deploy": "wrangler deploy",

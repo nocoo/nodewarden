@@ -15,6 +15,11 @@ const SCHEMA_STATEMENTS: readonly string[] = [
   'ALTER TABLE users ADD COLUMN totp_recovery_code TEXT',
   'ALTER TABLE users ADD COLUMN api_key TEXT',
 
+  'CREATE TABLE IF NOT EXISTS domain_settings (' +
+  'user_id TEXT PRIMARY KEY, equivalent_domains TEXT NOT NULL DEFAULT \'[]\', custom_equivalent_domains TEXT NOT NULL DEFAULT \'[]\', excluded_global_equivalent_domains TEXT NOT NULL DEFAULT \'[]\', updated_at TEXT NOT NULL, ' +
+  'FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)',
+  'ALTER TABLE domain_settings ADD COLUMN custom_equivalent_domains TEXT NOT NULL DEFAULT \'[]\'',
+
   'CREATE TABLE IF NOT EXISTS user_revisions (' +
   'user_id TEXT PRIMARY KEY, revision_date TEXT NOT NULL, ' +
   'FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)',

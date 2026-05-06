@@ -1,4 +1,6 @@
-import { ArrowUpDown, Cloud, Clock3, Folder as FolderIcon, KeyRound, Lock, LogOut, Send as SendIcon, Settings as SettingsIcon, Shield, ShieldUser } from 'lucide-preact';
+import { ChevronDown, Clock3, Cloud, Folder as FolderIcon, KeyRound, Lock, LogOut, Send as SendIcon, Settings as SettingsIcon, ShieldUser } from 'lucide-preact';
+import type { ComponentChildren } from 'preact';
+import { useState } from 'preact/hooks';
 import { Link } from 'wouter';
 import AppMainRoutes from '@/components/AppMainRoutes';
 import ThemeSwitch from '@/components/ThemeSwitch';
@@ -32,6 +34,53 @@ function isAdminProfile(profile: Profile | null): boolean {
 export default function AppAuthenticatedShell(props: AppAuthenticatedShellProps) {
   const routeAnimationKey = props.isImportRoute ? props.importRoute : props.location;
   const isAdmin = isAdminProfile(props.profile);
+  const vaultActive = props.location === '/vault' || props.location === '/vault/totp';
+  const settingsActive = props.location === props.settingsAccountRoute || props.location === '/settings/domain-rules';
+  const dataActive = props.location === '/backup' || props.isImportRoute;
+  const managementActive = props.location === '/admin' || props.location === '/security/devices';
+  const [expandedGroups, setExpandedGroups] = useState({
+    vault: true,
+    settings: false,
+    data: false,
+    management: false,
+  });
+
+  function toggleGroup(group: keyof typeof expandedGroups): void {
+    setExpandedGroups((current) => ({ ...current, [group]: !current[group] }));
+  }
+
+  function groupOpen(group: keyof typeof expandedGroups, active: boolean): boolean {
+    return expandedGroups[group] || active;
+  }
+
+  function renderNavGroup(
+    group: keyof typeof expandedGroups,
+    title: string,
+    icon: ComponentChildren,
+    active: boolean,
+    children: ComponentChildren
+  ) {
+    const open = groupOpen(group, active);
+    return (
+      <div className={`side-nav-group ${open ? 'open' : ''}`}>
+        <button
+          type="button"
+          className={`side-group-trigger ${active ? 'active' : ''}`}
+          aria-expanded={open}
+          onClick={() => toggleGroup(group)}
+        >
+          {icon}
+          <span>{title}</span>
+          <ChevronDown size={15} className="side-group-chevron" />
+        </button>
+        <div className={`side-subnav ${open ? 'open' : ''}`}>
+          <div className="side-subnav-inner">
+            {children}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-page">
@@ -76,45 +125,73 @@ export default function AppAuthenticatedShell(props: AppAuthenticatedShellProps)
 
         <div className="app-main">
           <aside className="app-side">
-            <Link href="/vault" className={`side-link ${props.location === '/vault' ? 'active' : ''}`}>
-              <KeyRound size={16} />
-              <span>{t('nav_my_vault')}</span>
-            </Link>
-            <Link href="/vault/totp" className={`side-link ${props.location === '/vault/totp' ? 'active' : ''}`}>
-              <Clock3 size={16} />
-              <span>{t('txt_verification_code')}</span>
-            </Link>
+            {renderNavGroup(
+              'vault',
+              t('nav_my_vault'),
+              <KeyRound size={16} />,
+              vaultActive,
+              <>
+                <Link href="/vault" className={`side-sub-link ${props.location === '/vault' ? 'active' : ''}`}>
+                  <span>{t('nav_vault_items')}</span>
+                </Link>
+                <Link href="/vault/totp" className={`side-sub-link ${props.location === '/vault/totp' ? 'active' : ''}`}>
+                  <span>{t('txt_verification_code')}</span>
+                </Link>
+              </>
+            )}
             <Link href="/sends" className={`side-link ${props.location === '/sends' ? 'active' : ''}`}>
               <SendIcon size={16} />
               <span>{t('nav_sends')}</span>
             </Link>
-            {isAdmin && (
-              <Link href="/admin" className={`side-link ${props.location === '/admin' ? 'active' : ''}`}>
-                <ShieldUser size={16} />
-                <span>{t('nav_admin_panel')}</span>
-              </Link>
+            {renderNavGroup(
+              'settings',
+              t('txt_settings'),
+              <SettingsIcon size={16} />,
+              settingsActive,
+              <>
+                <Link href={props.settingsAccountRoute} className={`side-sub-link ${props.location === props.settingsAccountRoute ? 'active' : ''}`}>
+                  <span>{t('nav_account_settings')}</span>
+                </Link>
+                <Link href="/settings/domain-rules" className={`side-sub-link ${props.location === '/settings/domain-rules' ? 'active' : ''}`}>
+                  <span>{t('nav_domain_rules')}</span>
+                </Link>
+              </>
             )}
-            <Link href={props.settingsAccountRoute} className={`side-link ${props.location === props.settingsAccountRoute ? 'active' : ''}`}>
-              <SettingsIcon size={16} />
-              <span>{t('nav_account_settings')}</span>
-            </Link>
-            <Link href="/security/devices" className={`side-link ${props.location === '/security/devices' ? 'active' : ''}`}>
-              <Shield size={16} />
-              <span>{t('nav_device_management')}</span>
-            </Link>
-            {isAdmin && (
-              <Link href="/backup" className={`side-link ${props.location === '/backup' ? 'active' : ''}`}>
-                <Cloud size={16} />
-                <span>{t('nav_backup_strategy')}</span>
-              </Link>
+            {renderNavGroup(
+              'data',
+              t('nav_group_data_backup'),
+              <Cloud size={16} />,
+              dataActive,
+              <>
+                {isAdmin && (
+                  <Link href="/backup" className={`side-sub-link ${props.location === '/backup' ? 'active' : ''}`}>
+                    <span>{t('nav_backup_strategy')}</span>
+                  </Link>
+                )}
+                <Link href={props.importRoute} className={`side-sub-link ${props.isImportRoute ? 'active' : ''}`}>
+                  <span>{t('nav_import_export')}</span>
+                </Link>
+              </>
             )}
-            <Link href={props.importRoute} className={`side-link ${props.isImportRoute ? 'active' : ''}`}>
-              <ArrowUpDown size={14} />
-              <span>{t('nav_import_export')}</span>
-            </Link>
+            {renderNavGroup(
+              'management',
+              t('nav_group_management'),
+              <ShieldUser size={16} />,
+              managementActive,
+              <>
+                {isAdmin && (
+                  <Link href="/admin" className={`side-sub-link ${props.location === '/admin' ? 'active' : ''}`}>
+                    <span>{t('nav_admin_panel')}</span>
+                  </Link>
+                )}
+                <Link href="/security/devices" className={`side-sub-link ${props.location === '/security/devices' ? 'active' : ''}`}>
+                  <span>{t('nav_device_management')}</span>
+                </Link>
+              </>
+            )}
           </aside>
           <main className="content">
-            <div key={routeAnimationKey} className="route-stage">
+            <div key={routeAnimationKey} className={`route-stage ${props.location === '/settings/domain-rules' ? 'route-stage-fixed' : ''}`}>
               <AppMainRoutes {...props.mainRoutesProps} />
             </div>
           </main>
