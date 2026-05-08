@@ -1,6 +1,14 @@
 // IMPORTANT:
-// Keep this schema list in sync with migrations/0001_init.sql.
-// Any new table/column/index must be added to both places together.
+// This is the runtime D1 schema bootstrap. Keep it in sync with
+// migrations/0001_init.sql. Any new table/column/index must be added to both
+// places together.
+//
+// WHEN CHANGING THIS:
+// - Bump STORAGE_SCHEMA_VERSION in src/services/storage.ts so existing installs
+//   rerun these idempotent statements.
+// - If the new table stores persistent data, update the backup export/import
+//   contract in src/services/backup-archive.ts and backup-import.ts.
+// - Keep statements idempotent; D1 may execute them again on later requests.
 const SCHEMA_STATEMENTS: readonly string[] = [
   'CREATE TABLE IF NOT EXISTS users (' +
   'id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT, master_password_hint TEXT, master_password_hash TEXT NOT NULL, ' +

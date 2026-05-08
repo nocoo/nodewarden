@@ -1,6 +1,12 @@
 import type { UserDomainSettings } from '../types';
 import { normalizeCustomEquivalentDomains, normalizeEquivalentDomains } from './domain-rules';
 
+// Storage adapter for the domain_settings table.
+//
+// CONTRACT:
+// equivalent_domains is kept as the active derived groups for compatibility and
+// fallback reads. custom_equivalent_domains is the full rule list that preserves
+// UI/client state. Save both together through saveUserDomainSettings().
 function parseJsonArray<T>(raw: string | null | undefined, fallback: T[]): T[] {
   if (!raw) return fallback;
   try {

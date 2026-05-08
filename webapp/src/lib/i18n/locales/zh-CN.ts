@@ -898,6 +898,13 @@ const zhCN: Record<string, string> = {
   "txt_add_domain": "新增域名",
   "txt_expand": "展开",
   "txt_collapse": "收起",
+  "txt_nav_layout": "导航样式",
+  "txt_nav_layout_flat": "直接显示",
+  "txt_nav_layout_flat_desc": "所有页面直接列出来",
+  "txt_nav_layout_grouped_expanded": "分组展开",
+  "txt_nav_layout_grouped_expanded_desc": "父子菜单全部展开",
+  "txt_nav_layout_grouped_smart": "智能分组",
+  "txt_nav_layout_grouped_smart_desc": "当前相关分组自动展开",
   "txt_remove_domain": "移除域名"
 };
 

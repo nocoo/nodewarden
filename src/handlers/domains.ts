@@ -9,6 +9,11 @@ import {
 } from '../services/domain-rules';
 import { errorResponse, jsonResponse } from '../utils/response';
 
+// CONTRACT:
+// This route accepts both camelCase and PascalCase Bitwarden-compatible payloads.
+// It stores custom rules, then derives equivalentDomains from the non-excluded
+// custom rules. Keep this behavior aligned with backup import/export and
+// src/services/storage-domain-rules-repo.ts.
 function firstPresent(payload: Record<string, unknown>, keys: string[]): unknown {
   for (const key of keys) {
     if (Object.prototype.hasOwnProperty.call(payload, key)) return payload[key];

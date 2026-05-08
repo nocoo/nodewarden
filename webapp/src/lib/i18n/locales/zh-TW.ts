@@ -898,6 +898,13 @@ const zhTW: Record<string, string> = {
   "txt_add_domain": "新增域名",
   "txt_expand": "展開",
   "txt_collapse": "收起",
+  "txt_nav_layout": "導航樣式",
+  "txt_nav_layout_flat": "直接顯示",
+  "txt_nav_layout_flat_desc": "所有頁面直接列出",
+  "txt_nav_layout_grouped_expanded": "分組展開",
+  "txt_nav_layout_grouped_expanded_desc": "父子選單全部展開",
+  "txt_nav_layout_grouped_smart": "智能分組",
+  "txt_nav_layout_grouped_smart_desc": "目前相關分組自動展開",
   "txt_remove_domain": "移除域名"
 };
 

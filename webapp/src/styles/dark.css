@@ -47,6 +47,9 @@
 :root[data-theme='dark'] .or,
 :root[data-theme='dark'] .mobile-tab,
 :root[data-theme='dark'] .side-link,
+:root[data-theme='dark'] .side-group-trigger,
+:root[data-theme='dark'] .side-sub-link,
+:root[data-theme='dark'] .nav-layout-trigger,
 :root[data-theme='dark'] .user-chip,
 :root[data-theme='dark'] .list-count,
 :root[data-theme='dark'] .totp-code-username,
@@ -197,6 +200,8 @@
 
 :root[data-theme='dark'] .mobile-sidebar-sheet,
 :root[data-theme='dark'] .mobile-sidebar-close,
+:root[data-theme='dark'] .nav-layout-menu,
+:root[data-theme='dark'] .nav-layout-trigger,
 :root[data-theme='dark'] .table tr,
 :root[data-theme='dark'] .settings-subcard,
 :root[data-theme='dark'] .import-summary-table-wrap,
@@ -229,6 +234,13 @@
 }
 
 :root[data-theme='dark'] .mobile-sidebar-close:hover,
+:root[data-theme='dark'] .side-link:hover,
+:root[data-theme='dark'] .side-group-trigger:hover,
+:root[data-theme='dark'] .side-sub-link:hover,
+:root[data-theme='dark'] .nav-layout-trigger:hover,
+:root[data-theme='dark'] .nav-layout-trigger.active,
+:root[data-theme='dark'] .nav-layout-option:hover,
+:root[data-theme='dark'] .nav-layout-option.active,
 :root[data-theme='dark'] .mobile-sidebar-sheet .tree-btn.active,
 :root[data-theme='dark'] .mobile-settings-link.active,
 :root[data-theme='dark'] .backup-destination-item.active,

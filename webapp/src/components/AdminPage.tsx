@@ -207,7 +207,7 @@ export default function AdminPage(props: AdminPageProps) {
             )}
           </tbody>
         </table>
-        <div className="actions">
+        <div className="actions admin-pagination">
           <button type="button" className="btn btn-secondary small" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
             <ChevronLeft size={14} className="btn-icon" />
             {t('txt_prev')}

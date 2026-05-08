@@ -961,7 +961,7 @@ export default function App() {
   const domainRulesQuery = useQuery({
     queryKey: domainRulesQueryKey,
     queryFn: () => getDomainRules(authedFetch),
-    enabled: !IS_DEMO_MODE && phase === 'app' && !!session?.accessToken && vaultInitialDecryptDone && location === SETTINGS_DOMAIN_RULES_ROUTE,
+    enabled: !IS_DEMO_MODE && phase === 'app' && !!session?.accessToken && vaultInitialDecryptDone,
     staleTime: 30_000,
   });
   function handleSaveDomainRules(customEquivalentDomains: CustomEquivalentDomain[], excludedGlobalEquivalentDomains: number[]): Promise<void> {

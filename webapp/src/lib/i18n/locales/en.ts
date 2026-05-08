@@ -898,6 +898,13 @@ const en: Record<string, string> = {
   "txt_add_domain": "Add domain",
   "txt_expand": "Expand",
   "txt_collapse": "Collapse",
+  "txt_nav_layout": "Navigation style",
+  "txt_nav_layout_flat": "Flat",
+  "txt_nav_layout_flat_desc": "Show every page directly",
+  "txt_nav_layout_grouped_expanded": "Grouped",
+  "txt_nav_layout_grouped_expanded_desc": "Keep all groups expanded",
+  "txt_nav_layout_grouped_smart": "Smart groups",
+  "txt_nav_layout_grouped_smart_desc": "Open active groups as needed",
   "txt_remove_domain": "Remove domain"
 };
 

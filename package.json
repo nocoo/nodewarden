@@ -7,16 +7,16 @@
   "main": "src/index.ts",
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev -c wrangler.toml",
-    "dev:kv": "wrangler dev -c wrangler.kv.toml",
+    "dev": "npm run build && wrangler dev -c wrangler.toml",
+    "dev:kv": "npm run build && wrangler dev -c wrangler.kv.toml",
     "dev:demo": "vite --config webapp/vite.config.ts --mode demo --host 127.0.0.1 --port 5174",
     "build": "vite build --config webapp/vite.config.ts",
     "build:demo": "vite build --config webapp/vite.config.ts --mode demo && node scripts/pages-spa-redirects.cjs",
     "domains:sync": "node scripts/sync-global-domains.mjs",
     "i18n": "node scripts/i18n-validate.cjs",
     "i18n:validate": "node scripts/i18n-validate.cjs",
-    "deploy": "wrangler deploy",
-    "deploy:kv": "wrangler deploy -c wrangler.kv.toml",
+    "deploy": "npm run build && wrangler deploy",
+    "deploy:kv": "npm run build && wrangler deploy -c wrangler.kv.toml",
     "deploy:demo": "npm run build:demo && wrangler pages deploy dist --project-name nw-demo"
   },
   "keywords": [

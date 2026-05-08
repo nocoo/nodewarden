@@ -898,6 +898,13 @@ const es: Record<string, string> = {
   "txt_add_domain": "Añadir dominio",
   "txt_expand": "Expandir",
   "txt_collapse": "Contraer",
+  "txt_nav_layout": "Estilo de navegación",
+  "txt_nav_layout_flat": "Plano",
+  "txt_nav_layout_flat_desc": "Mostrar cada página directamente",
+  "txt_nav_layout_grouped_expanded": "Agrupado",
+  "txt_nav_layout_grouped_expanded_desc": "Mantener todos los grupos abiertos",
+  "txt_nav_layout_grouped_smart": "Grupos inteligentes",
+  "txt_nav_layout_grouped_smart_desc": "Abrir grupos activos cuando haga falta",
   "txt_remove_domain": "Quitar dominio"
 };
 

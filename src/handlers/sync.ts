@@ -11,6 +11,11 @@ import {
 } from '../utils/user-decryption';
 import { buildDomainsResponse } from '../services/domain-rules';
 
+// CONTRACT:
+// /api/sync reuses cipherToResponse() as the single cipher response shaper.
+// Filtering invalid cipher responses here protects clients from stored rows that
+// would otherwise make official apps fail after an HTTP 200 sync.
+// Keep this aligned with src/handlers/ciphers.ts when adding new vault fields.
 function buildSyncCacheRequest(request: Request, userId: string, revisionDate: string, excludeDomains: boolean, excludeSends: boolean): Request {
   const url = new URL(request.url);
   const cacheUrl = new URL(

@@ -1,3 +1,10 @@
+// CONTRACT:
+// Locale bundles are standalone and loaded on demand. Adding a locale requires
+// updating Locale, AVAILABLE_LOCALES, browser-language detection, localeLoaders,
+// scripts/i18n-utils.cjs, and the locale file itself.
+//
+// Do not call t() at module scope for exported arrays/constants; async init can
+// otherwise leave raw txt_* keys in the rendered UI.
 export type Locale =
   | 'en'
   | 'zh-CN'

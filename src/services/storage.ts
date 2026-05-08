@@ -112,6 +112,10 @@ import {
 
 const TWO_FACTOR_REMEMBER_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const STORAGE_SCHEMA_VERSION_KEY = 'schema.version';
+// IMPORTANT:
+// Bump this whenever src/services/storage-schema.ts or migrations/0001_init.sql
+// changes. Existing D1 installs only rerun ensureStorageSchema() when this value
+// differs from config.schema.version.
 const STORAGE_SCHEMA_VERSION = '2026-05-05-domain-rules-v2';
 
 // D1-backed storage.

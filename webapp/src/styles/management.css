@@ -864,6 +864,10 @@
   color: #5f6f85;
 }
 
+.admin-pagination {
+  @apply mt-3 items-center;
+}
+
 .trusted-cell {
   @apply inline-flex items-center gap-1.5;
 }

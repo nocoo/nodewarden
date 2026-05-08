@@ -898,6 +898,13 @@ const ru: Record<string, string> = {
   "txt_add_domain": "Добавить домен",
   "txt_expand": "Развернуть",
   "txt_collapse": "Свернуть",
+  "txt_nav_layout": "Стиль навигации",
+  "txt_nav_layout_flat": "Плоский",
+  "txt_nav_layout_flat_desc": "Показывать все страницы сразу",
+  "txt_nav_layout_grouped_expanded": "Группы",
+  "txt_nav_layout_grouped_expanded_desc": "Держать все группы открытыми",
+  "txt_nav_layout_grouped_smart": "Умные группы",
+  "txt_nav_layout_grouped_smart_desc": "Открывать активные группы по необходимости",
   "txt_remove_domain": "Удалить домен"
 };
 
