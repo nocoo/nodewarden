@@ -231,6 +231,8 @@ export default function App() {
   const pendingVaultCoreRefreshRef = useRef<Promise<unknown> | null>(null);
   const notificationRefreshTimerRef = useRef<number | null>(null);
   const domainRulesSaveSeqRef = useRef(0);
+  const loginEmailRef = useRef(loginValues.email);
+  const loginHintRequestSeqRef = useRef(0);
   const { toasts, pushToast, removeToast } = useToastManager();
 
   useEffect(() => {
@@ -263,6 +265,7 @@ export default function App() {
   }, [inviteCodeFromUrl]);
 
   useEffect(() => {
+    loginEmailRef.current = loginValues.email;
     const normalizedEmail = loginValues.email.trim().toLowerCase();
     setLoginHintState((prev) => (
       prev.email && prev.email !== normalizedEmail
@@ -634,6 +637,7 @@ export default function App() {
       return;
     }
 
+    const requestSeq = ++loginHintRequestSeqRef.current;
     setLoginHintState({
       email,
       loading: true,
@@ -642,6 +646,7 @@ export default function App() {
 
     try {
       const result = await getPasswordHint(email);
+      if (loginHintRequestSeqRef.current !== requestSeq || loginEmailRef.current.trim().toLowerCase() !== email) return;
       openPasswordHintDialog(result.masterPasswordHint);
       setLoginHintState({
         email,
@@ -649,6 +654,7 @@ export default function App() {
         hint: result.masterPasswordHint,
       });
     } catch (error) {
+      if (loginHintRequestSeqRef.current !== requestSeq || loginEmailRef.current.trim().toLowerCase() !== email) return;
       setLoginHintState({
         email: '',
         loading: false,

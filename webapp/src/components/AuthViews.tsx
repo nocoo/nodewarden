@@ -227,6 +227,7 @@ export default function AuthViews(props: AuthViewsProps) {
               value={props.loginValues.email}
               autoComplete="username"
               placeholder={props.authPlaceholder}
+              autoFocus
               onInput={(e) => props.onChangeLogin({ ...props.loginValues, email: (e.currentTarget as HTMLInputElement).value })}
             />
           </label>
@@ -236,7 +237,6 @@ export default function AuthViews(props: AuthViewsProps) {
             autoComplete="current-password"
             placeholder={props.authPlaceholder}
             onInput={(v) => props.onChangeLogin({ ...props.loginValues, password: v })}
-            autoFocus
           />
           <div className="auth-support-row">
             <span />
@@ -244,7 +244,7 @@ export default function AuthViews(props: AuthViewsProps) {
               type="button"
               className="auth-link-btn"
               onClick={props.onTogglePasswordHint}
-              disabled={loginBusy || !props.loginValues.email.trim()}
+              disabled={loginBusy || props.loginHintLoading || !props.loginValues.email.trim()}
             >
               {props.loginHintLoading
                 ? t('txt_loading_password_hint')

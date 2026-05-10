@@ -208,6 +208,7 @@
 :root[data-theme='dark'] .backup-help-bubble,
 :root[data-theme='dark'] .backup-recommendation-card,
 :root[data-theme='dark'] .backup-recommendation-dav-item,
+:root[data-theme='dark'] .backup-recommendations-summary,
 :root[data-theme='dark'] .backup-browser-path,
 :root[data-theme='dark'] .backup-browser-list,
 :root[data-theme='dark'] .restore-progress-card,

@@ -1,25 +1,8 @@
-import type { JSX, RefObject } from 'preact';
+import type { RefObject } from 'preact';
 import { createPortal } from 'preact/compat';
-import { CheckCheck, Download, GripVertical, Paperclip, Plus, QrCode, RefreshCw, Star, StarOff, Trash2, Upload, X } from 'lucide-preact';
+import { ArrowDown, ArrowUp, CheckCheck, Download, Paperclip, Plus, QrCode, RefreshCw, Star, StarOff, Trash2, Upload, X } from 'lucide-preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useDialogLifecycle } from '@/components/ConfirmDialog';
-import {
-  closestCenter,
-  DndContext,
-  type DragEndEvent,
-  type DragStartEvent,
-  PointerSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  arrayMove,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import type { Cipher, Folder, VaultDraft, VaultDraftField } from '@/lib/types';
 import { t } from '@/lib/i18n';
 import {
@@ -67,46 +50,45 @@ interface VaultEditorProps {
   onDeleteSelected: () => void;
 }
 
-interface SortableWebsiteRowProps {
-  id: string;
+interface WebsiteRowProps {
   uriEntry: VaultDraft['loginUris'][number];
   index: number;
   canRemove: boolean;
-  isDragging: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
   onUpdateUri: (index: number, value: string) => void;
   onUpdateMatch: (index: number, value: number | null) => void;
+  onMove: (fromIndex: number, toIndex: number) => void;
   onRemove: (index: number) => void;
 }
 
-function SortableWebsiteRow(props: SortableWebsiteRowProps) {
+function WebsiteRow(props: WebsiteRowProps) {
   const websiteMatchOptions = getWebsiteMatchOptions();
-  const { attributes, listeners, setActivatorNodeRef, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: props.id,
-  });
-  const dragButtonAttributes = attributes as JSX.HTMLAttributes<HTMLButtonElement>;
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`website-row${isDragging || props.isDragging ? ' is-dragging' : ''}`}
-    >
-      <button
-        type="button"
-        ref={setActivatorNodeRef}
-        className="btn btn-secondary small website-drag-btn"
-        title={t('txt_drag_to_reorder')}
-        aria-label={t('txt_drag_to_reorder')}
-        {...dragButtonAttributes}
-        {...listeners}
-      >
-        <GripVertical size={14} className="btn-icon" />
-      </button>
+    <div className="website-row">
+      <div className="website-order-actions">
+        <button
+          type="button"
+          className="btn btn-secondary small website-order-btn"
+          title={t('txt_move_up')}
+          aria-label={t('txt_move_up')}
+          disabled={!props.canMoveUp}
+          onClick={() => props.onMove(props.index, props.index - 1)}
+        >
+          <ArrowUp size={14} className="btn-icon" />
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary small website-order-btn"
+          title={t('txt_move_down')}
+          aria-label={t('txt_move_down')}
+          disabled={!props.canMoveDown}
+          onClick={() => props.onMove(props.index, props.index + 1)}
+        >
+          <ArrowDown size={14} className="btn-icon" />
+        </button>
+      </div>
       <input
         className="input"
         value={props.uriEntry.uri}
@@ -127,7 +109,13 @@ function SortableWebsiteRow(props: SortableWebsiteRowProps) {
         ))}
       </select>
       {props.canRemove && (
-        <button type="button" className="btn btn-secondary small" onClick={() => props.onRemove(props.index)}>
+        <button
+          type="button"
+          className="btn btn-secondary small website-remove-btn"
+          title={t('txt_remove')}
+          aria-label={t('txt_remove')}
+          onClick={() => props.onRemove(props.index)}
+        >
           <X size={14} className="btn-icon" />
           {t('txt_remove')}
         </button>
@@ -138,32 +126,14 @@ function SortableWebsiteRow(props: SortableWebsiteRowProps) {
 
 export default function VaultEditor(props: VaultEditorProps) {
   const createTypeOptions = getCreateTypeOptions();
-  const uriIdSeedRef = useRef(0);
   const totpQrVideoRef = useRef<HTMLVideoElement | null>(null);
   const totpQrFileRef = useRef<HTMLInputElement | null>(null);
   const totpQrStreamRef = useRef<MediaStream | null>(null);
   const totpQrFrameRef = useRef<number | null>(null);
-  const [uriItemIds, setUriItemIds] = useState<string[]>([]);
-  const [activeUriId, setActiveUriId] = useState<string | null>(null);
   const [totpQrOpen, setTotpQrOpen] = useState(false);
   const [totpQrStatus, setTotpQrStatus] = useState('');
   const [totpQrBusy, setTotpQrBusy] = useState(false);
   useDialogLifecycle(totpQrOpen, () => setTotpQrOpen(false));
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 6,
-      },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 120,
-        tolerance: 8,
-      },
-    }),
-  );
-
-  const createUriId = () => `login-uri-${uriIdSeedRef.current++}`;
 
   const stopTotpQrScanner = () => {
     if (totpQrFrameRef.current != null) {
@@ -221,21 +191,6 @@ export default function VaultEditor(props: VaultEditorProps) {
       setTotpQrBusy(false);
     }
   };
-
-  useEffect(() => {
-    setUriItemIds((prev) => {
-      if (prev.length === props.draft.loginUris.length) return prev;
-      if (prev.length < props.draft.loginUris.length) {
-        return [...prev, ...Array.from({ length: props.draft.loginUris.length - prev.length }, () => createUriId())];
-      }
-      return prev.slice(0, props.draft.loginUris.length);
-    });
-  }, [props.draft.loginUris.length]);
-
-  useEffect(() => {
-    setUriItemIds(props.draft.loginUris.map(() => createUriId()));
-    setActiveUriId(null);
-  }, [props.draft.id, props.isCreating]);
 
   useEffect(() => {
     if (!totpQrOpen) {
@@ -324,28 +279,15 @@ export default function VaultEditor(props: VaultEditorProps) {
         });
 
   const addLoginUri = () => {
-    setUriItemIds((prev) => [...prev, createUriId()]);
     props.onUpdateDraft({ loginUris: [...props.draft.loginUris, createEmptyLoginUri()] });
   };
 
   const removeLoginUri = (index: number) => {
-    setUriItemIds((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
     props.onUpdateDraft({ loginUris: props.draft.loginUris.filter((_, itemIndex) => itemIndex !== index) });
   };
 
-  const handleWebsiteDragStart = (event: DragStartEvent) => {
-    setActiveUriId(String(event.active.id));
-  };
-
-  const handleWebsiteDragEnd = (event: DragEndEvent) => {
-    const activeId = String(event.active.id);
-    const overId = event.over ? String(event.over.id) : null;
-    setActiveUriId(null);
-    if (!overId || activeId === overId) return;
-    const fromIndex = uriItemIds.indexOf(activeId);
-    const toIndex = uriItemIds.indexOf(overId);
-    if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return;
-    setUriItemIds((prev) => arrayMove(prev, fromIndex, toIndex));
+  const moveLoginUri = (fromIndex: number, toIndex: number) => {
+    if (fromIndex < 0 || toIndex < 0 || fromIndex >= props.draft.loginUris.length || toIndex >= props.draft.loginUris.length || fromIndex === toIndex) return;
     props.onReorderDraftLoginUri(fromIndex, toIndex);
   };
 
@@ -435,23 +377,20 @@ export default function VaultEditor(props: VaultEditorProps) {
               <Plus size={14} className="btn-icon" /> {t('txt_add_website')}
             </button>
           </div>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleWebsiteDragStart} onDragEnd={handleWebsiteDragEnd}>
-            <SortableContext items={uriItemIds} strategy={verticalListSortingStrategy}>
-              {props.draft.loginUris.map((uriEntry, index) => (
-                <SortableWebsiteRow
-                  key={uriItemIds[index] ?? `uri-${index}`}
-                  id={uriItemIds[index] ?? `uri-fallback-${index}`}
-                  uriEntry={uriEntry}
-                  index={index}
-                  canRemove={props.draft.loginUris.length > 1}
-                  isDragging={activeUriId === uriItemIds[index]}
-                  onUpdateUri={props.onUpdateDraftLoginUri}
-                  onUpdateMatch={props.onUpdateDraftLoginUriMatch}
-                  onRemove={removeLoginUri}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
+          {props.draft.loginUris.map((uriEntry, index) => (
+            <WebsiteRow
+              key={`uri-${index}`}
+              uriEntry={uriEntry}
+              index={index}
+              canMoveUp={index > 0}
+              canMoveDown={index < props.draft.loginUris.length - 1}
+              canRemove={props.draft.loginUris.length > 1}
+              onUpdateUri={props.onUpdateDraftLoginUri}
+              onUpdateMatch={props.onUpdateDraftLoginUriMatch}
+              onMove={moveLoginUri}
+              onRemove={removeLoginUri}
+            />
+          ))}
           {props.draft.loginFido2Credentials.length > 0 && (
             <>
               <div className="section-head passkeys-section-head">
