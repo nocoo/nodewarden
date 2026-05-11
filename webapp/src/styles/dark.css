@@ -198,6 +198,27 @@
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24), 0 0 0 1px rgba(139, 184, 255, 0.12);
 }
 
+:root[data-theme='dark'] .card-brand-icon {
+  color: #bfdbfe;
+  background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--line));
+}
+
+:root[data-theme='dark'] .card-brand-icon:has(img) {
+  background: #fff;
+}
+
+:root[data-theme='dark'] .card-brand-american-express {
+  color: #fff;
+  background: #2563eb;
+}
+
+:root[data-theme='dark'] .card-brand-mastercard,
+:root[data-theme='dark'] .card-brand-maestro,
+:root[data-theme='dark'] .card-brand-discover {
+  color: #f8fafc;
+}
+
 :root[data-theme='dark'] .mobile-sidebar-sheet,
 :root[data-theme='dark'] .mobile-sidebar-close,
 :root[data-theme='dark'] .nav-layout-menu,

@@ -22,6 +22,7 @@ import {
 } from './handlers/notifications';
 import { handlePublicUploadSendFile } from './handlers/sends';
 import { jsonResponse } from './utils/response';
+import { StorageService } from './services/storage';
 import type { Env } from './types';
 
 type PublicRateLimiter = (category?: string, maxRequests?: number) => Promise<Response | null>;
@@ -31,6 +32,7 @@ export interface WebBootstrapResponse {
   defaultKdfIterations: number;
   jwtUnsafeReason: JwtUnsafeReason;
   jwtSecretMinLength: number;
+  registrationInviteRequired: boolean;
 }
 
 function isSameOriginWriteRequest(request: Request): boolean {
@@ -238,7 +240,7 @@ async function handleWebsiteIcon(host: string, fallbackMode: 'default' | 'not-fo
   return fallbackMode === 'not-found' ? handleMissingWebsiteIcon() : handleNwFavicon();
 }
 
-export function buildWebBootstrapResponse(env: Env): WebBootstrapResponse {
+export async function buildWebBootstrapResponse(env: Env): Promise<WebBootstrapResponse> {
   const secret = (env.JWT_SECRET || '').trim();
   const jwtUnsafeReason =
     !secret
@@ -248,11 +250,14 @@ export function buildWebBootstrapResponse(env: Env): WebBootstrapResponse {
         : secret.length < LIMITS.auth.jwtSecretMinLength
           ? 'too_short'
           : null;
+  const storage = new StorageService(env.DB);
+  const userCount = await storage.getUserCount();
 
   return {
     defaultKdfIterations: LIMITS.auth.defaultKdfIterations,
     jwtUnsafeReason,
     jwtSecretMinLength: LIMITS.auth.jwtSecretMinLength,
+    registrationInviteRequired: userCount > 0,
   };
 }
 
@@ -276,7 +281,7 @@ export async function handlePublicRoute(
   if ((path === '/api/web-bootstrap' || path === '/web-bootstrap') && method === 'GET') {
     const blocked = await enforcePublicRateLimit('public-read', LIMITS.rateLimit.publicReadRequestsPerMinute);
     if (blocked) return blocked;
-    return jsonResponse(buildWebBootstrapResponse(env));
+    return jsonResponse(await buildWebBootstrapResponse(env));
   }
 
   const iconMatch = path.match(/^\/icons\/([^/]+)\/icon\.png$/i);

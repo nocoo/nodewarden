@@ -1,5 +1,5 @@
 import { t } from '@/lib/i18n';
-import type { DomainRules, TokenError } from '@/lib/types';
+import type { DomainRules } from '@/lib/types';
 import { parseErrorMessage, parseJson, type AuthedFetch } from './shared';
 
 function normalizeDomainsResponse(body: Partial<DomainRules> & Record<string, unknown>): DomainRules {
@@ -53,8 +53,7 @@ export async function saveDomainRules(
     body: JSON.stringify(payload),
   });
   if (!resp.ok) {
-    const body = await parseJson<TokenError>(resp);
-    throw new Error(body?.error_description || body?.error || t('txt_domain_rules_save_failed'));
+    throw new Error(await parseErrorMessage(resp, t('txt_domain_rules_save_failed')));
   }
   const body = await parseJson<Partial<DomainRules> & Record<string, unknown>>(resp);
   if (!body) throw new Error(t('txt_domain_rules_invalid_response'));

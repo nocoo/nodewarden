@@ -287,6 +287,7 @@ export interface WebBootstrapResponse {
   defaultKdfIterations?: number;
   jwtUnsafeReason?: 'missing' | 'default' | 'too_short' | null;
   jwtSecretMinLength?: number;
+  registrationInviteRequired?: boolean;
 }
 
 export interface TokenSuccess {

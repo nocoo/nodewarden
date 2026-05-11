@@ -5,13 +5,17 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { useDialogLifecycle } from '@/components/ConfirmDialog';
 import type { Cipher, Folder, VaultDraft, VaultDraftField } from '@/lib/types';
 import { t } from '@/lib/i18n';
+import { cardBrand } from '@/lib/import-format-shared';
 import {
+  CARD_BRAND_OPTIONS,
+  CardBrandIcon,
   cipherTypeLabel,
   createEmptyLoginUri,
   formatAttachmentSize,
   formatHistoryTime,
   getCreateTypeOptions,
   getWebsiteMatchOptions,
+  normalizeCardBrand,
   toBooleanFieldValue,
 } from '@/components/vault/vault-page-helpers';
 
@@ -126,6 +130,10 @@ function WebsiteRow(props: WebsiteRowProps) {
 
 export default function VaultEditor(props: VaultEditorProps) {
   const createTypeOptions = getCreateTypeOptions();
+  const normalizedDraftCardBrand = normalizeCardBrand(props.draft.cardBrand);
+  const cardBrandOptions = normalizedDraftCardBrand && !CARD_BRAND_OPTIONS.includes(normalizedDraftCardBrand as any)
+    ? [...CARD_BRAND_OPTIONS, normalizedDraftCardBrand]
+    : CARD_BRAND_OPTIONS;
   const totpQrVideoRef = useRef<HTMLVideoElement | null>(null);
   const totpQrFileRef = useRef<HTMLInputElement | null>(null);
   const totpQrStreamRef = useRef<MediaStream | null>(null);
@@ -435,8 +443,37 @@ export default function VaultEditor(props: VaultEditorProps) {
           <h4>{t('txt_card_details')}</h4>
           <div className="field-grid">
             <label className="field"><span>{t('txt_cardholder_name')}</span><input className="input" value={props.draft.cardholderName} onInput={(e) => props.onUpdateDraft({ cardholderName: (e.currentTarget as HTMLInputElement).value })} /></label>
-            <label className="field"><span>{t('txt_number')}</span><input className="input" value={props.draft.cardNumber} onInput={(e) => props.onUpdateDraft({ cardNumber: (e.currentTarget as HTMLInputElement).value })} /></label>
-            <label className="field"><span>{t('txt_brand')}</span><input className="input" value={props.draft.cardBrand} onInput={(e) => props.onUpdateDraft({ cardBrand: (e.currentTarget as HTMLInputElement).value })} /></label>
+            <label className="field">
+              <span>{t('txt_number')}</span>
+              <input
+                className="input"
+                value={props.draft.cardNumber}
+                onInput={(e) => {
+                  const value = (e.currentTarget as HTMLInputElement).value;
+                  const detectedBrand = normalizeCardBrand(cardBrand(value) || '');
+                  props.onUpdateDraft({
+                    cardNumber: value,
+                    ...(props.draft.cardBrand ? {} : { cardBrand: detectedBrand }),
+                  });
+                }}
+              />
+            </label>
+            <label className="field">
+              <span>{t('txt_brand')}</span>
+              <div className="card-brand-select-row">
+                <CardBrandIcon brand={normalizedDraftCardBrand} />
+                <select
+                  className="input card-brand-select"
+                  value={normalizedDraftCardBrand}
+                  onInput={(e) => props.onUpdateDraft({ cardBrand: (e.currentTarget as HTMLSelectElement).value })}
+                >
+                  <option value="">{t('txt_select')}</option>
+                  {cardBrandOptions.map((brand) => (
+                    <option key={brand} value={brand}>{brand}</option>
+                  ))}
+                </select>
+              </div>
+            </label>
             <label className="field"><span>{t('txt_security_code_cvv')}</span><input className="input" value={props.draft.cardCode} onInput={(e) => props.onUpdateDraft({ cardCode: (e.currentTarget as HTMLInputElement).value })} /></label>
             <label className="field"><span>{t('txt_expiry_month')}</span><input className="input" value={props.draft.cardExpMonth} onInput={(e) => props.onUpdateDraft({ cardExpMonth: (e.currentTarget as HTMLInputElement).value })} /></label>
             <label className="field"><span>{t('txt_expiry_year')}</span><input className="input" value={props.draft.cardExpYear} onInput={(e) => props.onUpdateDraft({ cardExpYear: (e.currentTarget as HTMLInputElement).value })} /></label>
@@ -632,7 +669,11 @@ export default function VaultEditor(props: VaultEditorProps) {
                       <span>{toBooleanFieldValue(field.value) ? t('txt_checked') : t('txt_unchecked')}</span>
                     </label>
                   ) : (
-                    <input className="input" value={field.value} onInput={(e) => props.onPatchDraftCustomField(originalIndex, { value: (e.currentTarget as HTMLInputElement).value })} />
+                    <textarea
+                      className="input textarea custom-field-textarea"
+                      value={field.value}
+                      onInput={(e) => props.onPatchDraftCustomField(originalIndex, { value: (e.currentTarget as HTMLTextAreaElement).value })}
+                    />
                   )}
                 </div>
                 <button type="button" className="btn btn-secondary small custom-field-remove" onClick={() => props.onUpdateDraftCustomFields(props.draft.customFields.filter((_, i) => i !== originalIndex))}>

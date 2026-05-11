@@ -171,6 +171,7 @@ export default function App() {
   const [session, setSessionState] = useState<SessionState | null>(initialBootstrap.session);
   const [profile, setProfile] = useState<Profile | null>(initialProfileSnapshot);
   const [defaultKdfIterations, setDefaultKdfIterations] = useState(initialBootstrap.defaultKdfIterations);
+  const [registrationInviteRequired, setRegistrationInviteRequired] = useState(initialBootstrap.registrationInviteRequired);
   const [jwtWarning, setJwtWarning] = useState<{ reason: JwtUnsafeReason; minLength: number } | null>(initialBootstrap.jwtWarning);
 
   const [loginValues, setLoginValues] = useState({ email: '', password: '' });
@@ -413,6 +414,7 @@ export default function App() {
       const normalizedCurrentHashPath = currentHashPath.replace(/^\/+/, '').replace(/\/+$/, '');
       const isDemoPublicSendRoute = /^send\/[^/]+(?:\/[^/]+)?$/i.test(normalizedCurrentHashPath);
       setDefaultKdfIterations(initialBootstrap.defaultKdfIterations);
+      setRegistrationInviteRequired(initialBootstrap.registrationInviteRequired);
       setJwtWarning(null);
       setSession(null);
       setProfile(null);
@@ -427,6 +429,7 @@ export default function App() {
       const boot = await bootstrapAppSession(initialBootstrap);
       if (!mounted) return;
       setDefaultKdfIterations(boot.defaultKdfIterations);
+      setRegistrationInviteRequired(boot.registrationInviteRequired);
       setJwtWarning(boot.jwtWarning);
       setSession(boot.session);
       setProfile(boot.profile);
@@ -1409,6 +1412,12 @@ export default function App() {
   }, [phase, location, isPublicSendRoute, navigate]);
 
   useEffect(() => {
+    if (phase === 'register' && (location === '/' || location === '/login') && !isPublicSendRoute) {
+      navigate('/register');
+    }
+  }, [phase, location, isPublicSendRoute, navigate]);
+
+  useEffect(() => {
     if (phase === 'app' && isImportHashRoute && location !== IMPORT_ROUTE) {
       navigate(IMPORT_ROUTE);
     }
@@ -1605,6 +1614,7 @@ export default function App() {
           unlockPreparing={unlockPreparing}
           loginValues={loginValues}
           registerValues={registerValues}
+          registrationInviteRequired={registrationInviteRequired}
           unlockPassword={unlockPassword}
           emailForLock={profile?.email || session?.email || ''}
           loginHintLoading={loginHintState.loading}
