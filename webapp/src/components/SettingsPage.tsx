@@ -338,8 +338,7 @@ export default function SettingsPage(props: SettingsPageProps) {
         </div>
       </section>
 
-      <section className="card settings-module">
-        <h3>{t('txt_recovery_code_and_api_key')}</h3>
+      <section className="settings-module sensitive-actions-module">
         <div className="sensitive-actions-grid">
           <div className="sensitive-action">
             <div>

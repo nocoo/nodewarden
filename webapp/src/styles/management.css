@@ -505,6 +505,13 @@
   @apply min-w-0;
 }
 
+.sensitive-actions-module {
+  @apply min-w-0 p-0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
 .settings-module h3 {
   @apply mb-4 mt-0 text-base font-extrabold;
   color: var(--text);
@@ -533,9 +540,12 @@
 }
 
 .sensitive-action {
-  @apply rounded-lg border p-3.5;
-  border-color: var(--line-soft);
-  background: color-mix(in srgb, var(--surface) 74%, transparent);
+  @apply border;
+  border-radius: .5rem;
+  border-width: 1px;
+  padding: 23px .875rem;
+  border-color: var(--line);
+  background: var(--panel);
 }
 
 .sensitive-action h4 {
@@ -544,9 +554,11 @@
 }
 
 .recovery-code-card {
-  @apply mb-0 mt-2.5 rounded-lg border p-3;
-  border-color: var(--line-soft);
-  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  @apply mb-0 mt-2.5 border p-3;
+  border-radius: .5rem;
+  border-width: 1px;
+  border-color: var(--line);
+  background: var(--panel);
 }
 
 .recovery-code-value {
@@ -560,8 +572,8 @@
 
 .api-key-warning-panel {
   @apply mb-3.5 mt-3;
-  border: 1px solid color-mix(in srgb, var(--danger) 24%, transparent);
-  background: color-mix(in srgb, var(--danger) 7%, var(--surface));
+  border: 1px solid var(--line);
+  background: var(--panel);
 }
 
 .api-key-warning-title {
@@ -760,10 +772,11 @@
 }
 
 .restore-progress-elapsed {
-  @apply shrink-0 rounded-[10px] px-2 py-1.5 text-center text-[13px] font-semibold;
+  @apply shrink-0 px-2 py-1.5 text-center text-[13px] font-semibold;
   min-width: 88px;
-  background: #f8fbff;
-  border: 1px solid #d7e2f1;
+  border-radius: .5rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
   color: #475569;
 }
 
@@ -779,9 +792,10 @@
 }
 
 .restore-progress-current {
-  @apply mt-3 rounded-[10px] px-3 py-2.5;
-  background: #f8fbff;
-  border: 1px solid #d7e2f1;
+  @apply mt-3 px-3 py-2.5;
+  border-radius: .5rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
 }
 
 .restore-progress-current strong {

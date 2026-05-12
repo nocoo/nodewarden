@@ -281,7 +281,7 @@
 :root[data-theme='dark'] .restore-progress-card,
 :root[data-theme='dark'] .restore-progress-current,
 :root[data-theme='dark'] .restore-progress-elapsed {
-  border-color: var(--line-soft);
+  border-color: var(--line);
 }
 
 :root[data-theme='dark'] .import-summary-table th {
