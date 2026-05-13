@@ -687,11 +687,16 @@ h4 {
   color: var(--muted);
 }
 
-.settings-modules-grid,
 .import-export-panels,
 .backup-grid,
 .domain-rules-grid {
-  gap: 10px;
+  gap: 2px 10px;
+}
+
+.settings-modules-grid {
+  --settings-grid-gap: 10px;
+  gap: 2px var(--settings-grid-gap);
+  grid-template-columns: repeat(2, minmax(0, calc((100% - var(--settings-grid-gap)) / 2)));
 }
 
 .settings-module h3 {
@@ -887,6 +892,10 @@ h4 {
 
   .vault-grid {
     gap: 8px;
+  }
+
+  .settings-modules-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .mobile-detail-sheet {
@@ -1234,5 +1243,77 @@ input[type='file'].input::file-selector-button {
   .invite-pagination {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
+  }
+}
+
+/* Keep management routes mobile-first after the final polish layer overrides. */
+@media (max-width: 1180px) {
+  .content,
+  .route-stage,
+  .stack,
+  .backup-grid {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .route-stage {
+    overflow-x: hidden;
+  }
+
+  .backup-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 0;
+  }
+
+  .backup-operations-sidebar,
+  .backup-destination-sidebar,
+  .backup-detail-panel {
+    width: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  .table,
+  .table tbody,
+  .table tr,
+  .table td {
+    display: block;
+    width: 100%;
+  }
+
+  .table thead {
+    display: none;
+  }
+
+  .table {
+    border-spacing: 0;
+  }
+
+  .table tr {
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+  }
+
+  .table td {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line-soft);
+    overflow-wrap: anywhere;
+  }
+
+  .table td:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  .table td::before {
+    display: block;
+    content: attr(data-label);
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
   }
 }

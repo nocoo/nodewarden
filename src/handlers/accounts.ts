@@ -526,6 +526,7 @@ export async function handleChangePassword(request: Request, env: Env, userId: s
   user.updatedAt = new Date().toISOString();
   await storage.saveUser(user);
   await storage.deleteRefreshTokensByUserId(user.id);
+  AuthService.invalidateUserCache(user.id);
   await storage.createAuditLog({
     id: generateUUID(),
     actorUserId: user.id,
@@ -587,6 +588,7 @@ export async function handleSetTotpStatus(request: Request, env: Env, userId: st
     user.updatedAt = new Date().toISOString();
     await storage.saveUser(user);
     await storage.deleteRefreshTokensByUserId(user.id);
+    AuthService.invalidateUserCache(user.id);
     return jsonResponse({ enabled: true, recoveryCode: user.totpRecoveryCode, object: 'twoFactor' });
   }
 
@@ -601,6 +603,7 @@ export async function handleSetTotpStatus(request: Request, env: Env, userId: st
     user.updatedAt = new Date().toISOString();
     await storage.saveUser(user);
     await storage.deleteRefreshTokensByUserId(user.id);
+    AuthService.invalidateUserCache(user.id);
     return jsonResponse({ enabled: false, object: 'twoFactor' });
   }
 
@@ -708,6 +711,7 @@ export async function handleRecoverTwoFactor(request: Request, env: Env): Promis
   user.updatedAt = new Date().toISOString();
   await storage.saveUser(user);
   await storage.deleteRefreshTokensByUserId(user.id);
+  AuthService.invalidateUserCache(user.id);
   await rateLimit.clearLoginAttempts(recoverLimitKey);
 
   return jsonResponse({
@@ -801,6 +805,7 @@ async function apiKey(request: Request, env: Env, userId: string, rotate: boolea
     }
     user.updatedAt = new Date().toISOString();
     await storage.saveUser(user);
+    AuthService.invalidateUserCache(user.id);
   }
 
   return jsonResponse({

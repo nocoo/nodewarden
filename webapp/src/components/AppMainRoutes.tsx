@@ -116,6 +116,7 @@ export interface AppMainRoutesProps {
   onSaveDomainRules: (customEquivalentDomains: CustomEquivalentDomain[], excludedGlobalEquivalentDomains: number[]) => Promise<void>;
   onRenameAuthorizedDevice: (device: AuthorizedDevice, name: string) => Promise<void>;
   onRevokeDeviceTrust: (device: AuthorizedDevice) => void;
+  onTrustDevicePermanently: (device: AuthorizedDevice) => void;
   onRemoveDevice: (device: AuthorizedDevice) => void;
   onRevokeAllDeviceTrust: () => void;
   onRemoveAllDevices: () => void;
@@ -322,6 +323,7 @@ export default function AppMainRoutes(props: AppMainRoutesProps) {
               onRefresh={() => void props.onRefreshAuthorizedDevices()}
               onRenameDevice={props.onRenameAuthorizedDevice}
               onRevokeTrust={props.onRevokeDeviceTrust}
+              onTrustPermanently={props.onTrustDevicePermanently}
               onRemoveDevice={props.onRemoveDevice}
               onRevokeAll={props.onRevokeAllDeviceTrust}
               onRemoveAll={props.onRemoveAllDevices}

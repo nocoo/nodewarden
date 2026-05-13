@@ -1083,6 +1083,14 @@ export function createDemoMainRoutesProps(base: AppMainRoutesProps, notify: Noti
       )));
       notify('success', t('txt_device_authorization_revoked'));
     },
+    onTrustDevicePermanently: (device) => {
+      state.setAuthorizedDevices((prev) => prev.map((item) => (
+        item.identifier === device.identifier && item.trusted
+          ? { ...item, trustedUntil: '2099-12-31T23:59:59.000Z', revisionDate: new Date().toISOString() }
+          : item
+      )));
+      notify('success', t('txt_device_trusted_permanently'));
+    },
     onRemoveDevice: (device) => {
       state.setAuthorizedDevices((prev) => prev.filter((item) => item.identifier !== device.identifier));
       notify('success', t('txt_device_removed'));

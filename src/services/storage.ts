@@ -96,6 +96,7 @@ import {
   upsertDevice as saveStoredDevice,
   updateDeviceName as updateStoredDeviceName,
   updateDeviceKeys as updateStoredDeviceKeys,
+  updateTrustedTwoFactorTokensExpiryByDevice as updateStoredTrustedTokensExpiryByDevice,
 } from './storage-device-repo';
 import {
   ensureUsedAttachmentDownloadTokenTable as ensureStoredAttachmentTokenTable,
@@ -612,6 +613,10 @@ export class StorageService {
 
   async deleteTrustedTwoFactorTokensByUserId(userId: string): Promise<number> {
     return deleteStoredTrustedTokensByUserId(this.db, userId);
+  }
+
+  async updateTrustedTwoFactorTokensExpiryByDevice(userId: string, deviceIdentifier: string, expiresAtMs: number): Promise<number> {
+    return updateStoredTrustedTokensExpiryByDevice(this.db, userId, deviceIdentifier, expiresAtMs);
   }
 
   // --- Trusted 2FA remember tokens (device-bound) ---

@@ -1,4 +1,5 @@
 import { Env, User, Invite } from '../types';
+import { AuthService } from '../services/auth';
 import { StorageService } from '../services/storage';
 import { jsonResponse, errorResponse } from '../utils/response';
 import { generateUUID } from '../utils/uuid';
@@ -222,6 +223,7 @@ export async function handleAdminSetUserStatus(
   if (nextStatus === 'banned') {
     await storage.deleteRefreshTokensByUserId(target.id);
   }
+  AuthService.invalidateUserCache(target.id);
   await writeAuditLog(storage, actorUser.id, 'admin.user.status', 'user', target.id, {
     status: nextStatus,
   });
@@ -280,6 +282,7 @@ export async function handleAdminDeleteUser(
 
   await storage.deleteRefreshTokensByUserId(target.id);
   await storage.deleteUserById(target.id);
+  AuthService.invalidateUserCache(target.id);
   await writeAuditLog(storage, actorUser.id, 'admin.user.delete', 'user', target.id, {
     email: target.email,
   });

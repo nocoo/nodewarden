@@ -32,6 +32,17 @@ function resolveTotpSecret(userSecret: string | null): string | null {
   return null;
 }
 
+async function resolveDeviceSession(
+  storage: StorageService,
+  userId: string,
+  deviceInfo: ReturnType<typeof readAuthRequestDeviceInfo>
+): Promise<{ identifier: string; sessionStamp: string } | null> {
+  if (!deviceInfo.deviceIdentifier) return null;
+  const existingDevice = await storage.getDevice(userId, deviceInfo.deviceIdentifier);
+  const sessionStamp = String(existingDevice?.sessionStamp || '').trim() || generateUUID();
+  return { identifier: deviceInfo.deviceIdentifier, sessionStamp };
+}
+
 function shouldUseWebSession(request: Request): boolean {
   return String(request.headers.get('X-NodeWarden-Web-Session') || '').trim() === '1';
 }
@@ -320,10 +331,7 @@ export async function handleToken(request: Request, env: Env): Promise<Response>
     }
 
     // Persist device only after successful password + (optional) 2FA verification.
-    const deviceSession =
-      deviceInfo.deviceIdentifier
-        ? { identifier: deviceInfo.deviceIdentifier, sessionStamp: generateUUID() }
-        : null;
+    const deviceSession = await resolveDeviceSession(storage, user.id, deviceInfo);
     if (deviceSession) {
       await storage.upsertDevice(
         user.id,
@@ -413,10 +421,7 @@ export async function handleToken(request: Request, env: Env): Promise<Response>
     }
 
     // Persist device only after successful client credential verification.
-    const deviceSession =
-      deviceInfo.deviceIdentifier
-        ? { identifier: deviceInfo.deviceIdentifier, sessionStamp: generateUUID() }
-        : null;
+    const deviceSession = await resolveDeviceSession(storage, user.id, deviceInfo);
     if (deviceSession) {
       await storage.upsertDevice(
         user.id,

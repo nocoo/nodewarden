@@ -32,6 +32,25 @@ export class AuthService {
     this.storage = new StorageService(env.DB);
   }
 
+  static invalidateUserCache(userId: string): void {
+    const normalizedUserId = String(userId || '').trim();
+    if (!normalizedUserId) return;
+    AuthService.userCache.delete(normalizedUserId);
+    const prefix = `${normalizedUserId}:`;
+    for (const key of AuthService.deviceCache.keys()) {
+      if (key.startsWith(prefix)) {
+        AuthService.deviceCache.delete(key);
+      }
+    }
+  }
+
+  static invalidateDeviceCache(userId: string, deviceId: string): void {
+    const normalizedUserId = String(userId || '').trim();
+    const normalizedDeviceId = String(deviceId || '').trim();
+    if (!normalizedUserId || !normalizedDeviceId) return;
+    AuthService.deviceCache.delete(`${normalizedUserId}:${normalizedDeviceId}`);
+  }
+
   private readCachedUser(userId: string): User | null | undefined {
     const cached = AuthService.userCache.get(userId);
     if (!cached) return undefined;

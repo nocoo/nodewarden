@@ -425,7 +425,7 @@
 }
 
 .totp-grid {
-  @apply mb-3.5 grid gap-3.5;
+  @apply grid gap-3.5;
   grid-template-columns: 220px 1fr;
 }
 
@@ -497,12 +497,15 @@
 }
 
 .settings-modules-grid {
-  @apply grid gap-3;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  --settings-grid-gap: 12px;
+  @apply grid;
+  gap: var(--settings-grid-gap);
+  grid-template-columns: repeat(2, minmax(0, calc((100% - var(--settings-grid-gap)) / 2)));
 }
 
 .settings-module {
   @apply min-w-0;
+  width: 100%;
 }
 
 .sensitive-actions-module {
@@ -515,6 +518,21 @@
 .settings-module h3 {
   @apply mb-4 mt-0 text-base font-extrabold;
   color: var(--text);
+}
+
+.settings-module-head {
+  @apply mb-[5px] flex items-center justify-between gap-3;
+}
+
+.settings-module-head h3 {
+  @apply m-0;
+}
+
+.totp-status-pill {
+  @apply inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-extrabold;
+  border: 1px solid color-mix(in srgb, var(--success) 26%, var(--line));
+  background: color-mix(in srgb, var(--success) 9%, var(--panel));
+  color: var(--success);
 }
 
 .settings-module-placeholder {
@@ -536,7 +554,7 @@
 }
 
 .sensitive-actions-grid {
-  @apply grid gap-3;
+  @apply grid gap-[3px];
 }
 
 .sensitive-action {
