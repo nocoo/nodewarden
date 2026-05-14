@@ -17,6 +17,7 @@ import { generateUUID } from '../utils/uuid';
 import { deleteAllAttachmentsForCipher, deleteAllAttachmentsForCiphers } from './attachments';
 import { parsePagination, encodeContinuationToken } from '../utils/pagination';
 import { readActingDeviceIdentifier } from '../utils/device';
+import { auditRequestMetadata, writeAuditEvent } from '../services/audit-events';
 
 // CONTRACT:
 // Cipher JSON is the highest-risk Bitwarden compatibility surface. Preserve
@@ -81,6 +82,27 @@ function syncCipherComputedAliases(cipher: Cipher): Cipher {
   cipher.archivedDate = cipher.archivedAt ?? null;
   cipher.deletedDate = cipher.deletedAt ?? null;
   return cipher;
+}
+
+async function writeCipherAudit(
+  storage: StorageService,
+  request: Request,
+  userId: string,
+  action: string,
+  metadata: Record<string, unknown>
+): Promise<void> {
+  await writeAuditEvent(storage, {
+    actorUserId: userId,
+    action,
+    category: 'data',
+    level: action.includes('delete') ? 'security' : 'info',
+    targetType: 'cipher',
+    targetId: typeof metadata.id === 'string' ? metadata.id : null,
+    metadata: {
+      ...metadata,
+      ...auditRequestMetadata(request),
+    },
+  });
 }
 
 function isValidEncString(value: unknown): value is string {
@@ -584,6 +606,11 @@ export async function handleDeleteCipher(request: Request, env: Env, userId: str
   await storage.saveCipher(cipher);
   const revisionDate = await storage.updateRevisionDate(userId);
   notifyVaultSyncForRequest(request, env, userId, revisionDate);
+  await writeCipherAudit(storage, request, userId, 'cipher.delete.soft', {
+    id: cipher.id,
+    type: cipher.type,
+    folderId: cipher.folderId ?? null,
+  });
 
   return jsonResponse(
     cipherToResponse(cipher, [])
@@ -608,6 +635,12 @@ export async function handleDeleteCipherCompat(request: Request, env: Env, userI
     await storage.deleteCipher(id, userId);
     const revisionDate = await storage.updateRevisionDate(userId);
     notifyVaultSyncForRequest(request, env, userId, revisionDate);
+    await writeCipherAudit(storage, request, userId, 'cipher.delete.permanent', {
+      id,
+      type: cipher.type,
+      folderId: cipher.folderId ?? null,
+      compat: true,
+    });
     return new Response(null, { status: 204 });
   }
 
@@ -629,6 +662,11 @@ export async function handlePermanentDeleteCipher(request: Request, env: Env, us
   await storage.deleteCipher(id, userId);
   const revisionDate = await storage.updateRevisionDate(userId);
   notifyVaultSyncForRequest(request, env, userId, revisionDate);
+  await writeCipherAudit(storage, request, userId, 'cipher.delete.permanent', {
+    id,
+    type: cipher.type,
+    folderId: cipher.folderId ?? null,
+  });
 
   return new Response(null, { status: 204 });
 }
@@ -858,6 +896,9 @@ export async function handleBulkDeleteCiphers(request: Request, env: Env, userId
   const revisionDate = await storage.bulkSoftDeleteCiphers(body.ids, userId);
   if (revisionDate) {
     notifyVaultSyncForRequest(request, env, userId, revisionDate);
+    await writeCipherAudit(storage, request, userId, 'cipher.delete.soft.bulk', {
+      count: body.ids.length,
+    });
   }
 
   return new Response(null, { status: 204 });
@@ -917,6 +958,10 @@ export async function handleBulkPermanentDeleteCiphers(request: Request, env: En
   const revisionDate = await storage.bulkDeleteCiphers(ownedIds, userId);
   if (revisionDate) {
     notifyVaultSyncForRequest(request, env, userId, revisionDate);
+    await writeCipherAudit(storage, request, userId, 'cipher.delete.permanent.bulk', {
+      count: ownedIds.length,
+      requestedCount: ids.length,
+    });
   }
 
   return new Response(null, { status: 204 });

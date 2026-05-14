@@ -22,7 +22,7 @@ import {
   saveSession,
   stripProfileSecrets,
 } from '@/lib/api/auth';
-import { listAdminInvites, listAdminUsers } from '@/lib/api/admin';
+import { clearAuditLogs, getAuditLogSettings, listAdminInvites, listAdminUsers, listAuditLogs, saveAuditLogSettings, type AuditLogFilters } from '@/lib/api/admin';
 import { getDomainRules, saveDomainRules } from '@/lib/api/domains';
 import { getSends } from '@/lib/api/send';
 import { getCachedVaultCoreSnapshot, loadVaultCoreSyncSnapshot } from '@/lib/api/vault-sync';
@@ -69,7 +69,7 @@ import {
   createDemoMainRoutesProps,
 } from '@/lib/demo';
 import type { AdminBackupSettings } from '@/lib/api/backup';
-import type { AdminInvite, AdminUser, AppPhase, AuthorizedDevice, Cipher, CustomEquivalentDomain, DomainRules, Folder as VaultFolder, Profile, Send, SessionState } from '@/lib/types';
+import type { AdminInvite, AdminUser, AppPhase, AuditLogSettings, AuthorizedDevice, Cipher, CustomEquivalentDomain, DomainRules, Folder as VaultFolder, Profile, Send, SessionState } from '@/lib/types';
 import type { VaultCoreSnapshot } from '@/lib/vault-cache';
 
 function isBackupProgressDetail(value: unknown): value is BackupProgressDetail {
@@ -96,6 +96,7 @@ const APP_ROUTE_PATHS = [
   '/vault/totp',
   '/sends',
   '/admin',
+  '/logs',
   '/security/devices',
   '/backup',
   '/settings',
@@ -1398,6 +1399,7 @@ export default function App() {
     if (location === '/vault/totp') return t('txt_verification_code');
     if (location === '/sends') return t('nav_sends');
     if (location === '/admin') return t('nav_admin_panel');
+    if (location === '/logs') return t('nav_log_center');
     if (location === '/security/devices') return t('nav_device_management');
     if (location === SETTINGS_DOMAIN_RULES_ROUTE) return t('nav_domain_rules');
     if (location === '/backup') return t('nav_backup_strategy');
@@ -1424,7 +1426,7 @@ export default function App() {
   }, [phase, isImportHashRoute, location, navigate]);
 
   useEffect(() => {
-    if (phase === 'app' && !isAdminProfile(profile) && location === '/backup' && !profileQuery.isFetching) {
+    if (phase === 'app' && !isAdminProfile(profile) && (location === '/backup' || location === '/logs') && !profileQuery.isFetching) {
       navigate('/vault');
     }
   }, [phase, profile?.role, profileQuery.isFetching, location, navigate]);
@@ -1475,6 +1477,7 @@ export default function App() {
     onDeleteVaultItem: vaultSendActions.deleteVaultItem,
     onArchiveVaultItem: vaultSendActions.archiveVaultItem,
     onUnarchiveVaultItem: vaultSendActions.unarchiveVaultItem,
+    onRestoreVaultItems: vaultSendActions.bulkRestoreVaultItems,
     onBulkDeleteVaultItems: vaultSendActions.bulkDeleteVaultItems,
     onBulkPermanentDeleteVaultItems: vaultSendActions.bulkPermanentDeleteVaultItems,
     onBulkRestoreVaultItems: vaultSendActions.bulkRestoreVaultItems,
@@ -1527,6 +1530,10 @@ export default function App() {
     onToggleUserStatus: adminActions.toggleUserStatus,
     onDeleteUser: adminActions.deleteUser,
     onRevokeInvite: adminActions.revokeInvite,
+    onLoadAuditLogs: (filters: AuditLogFilters) => listAuditLogs(authedFetch, filters),
+    onLoadAuditLogSettings: () => getAuditLogSettings(authedFetch),
+    onSaveAuditLogSettings: (settings: AuditLogSettings) => saveAuditLogSettings(authedFetch, settings),
+    onClearAuditLogs: () => clearAuditLogs(authedFetch),
     onExportBackup: backupActions.exportBackup,
     onImportBackup: backupActions.importBackup,
     onImportBackupAllowingChecksumMismatch: backupActions.importBackupAllowingChecksumMismatch,

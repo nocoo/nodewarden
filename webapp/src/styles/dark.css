@@ -336,3 +336,33 @@
   background: color-mix(in srgb, var(--primary) 18%, var(--panel));
   color: var(--primary-strong);
 }
+
+:root[data-theme='dark'] .log-detail-head h3,
+:root[data-theme='dark'] .log-row-main strong,
+:root[data-theme='dark'] .log-detail-meta strong,
+:root[data-theme='dark'] .log-detail-json dd,
+:root[data-theme='dark'] .log-detail-json h4,
+:root[data-theme='dark'] .log-pagination-count {
+  color: var(--text);
+}
+
+:root[data-theme='dark'] .log-row-main small,
+:root[data-theme='dark'] .log-detail-meta span,
+:root[data-theme='dark'] .log-detail-json dt {
+  color: var(--muted);
+}
+
+:root[data-theme='dark'] .log-row,
+:root[data-theme='dark'] .log-detail-meta > div,
+:root[data-theme='dark'] .log-detail-json dl > div,
+:root[data-theme='dark'] .log-pagination-count {
+  background: var(--panel-muted);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+:root[data-theme='dark'] .log-row:hover,
+:root[data-theme='dark'] .log-row.active {
+  background: color-mix(in srgb, var(--primary) 12%, var(--panel));
+  border-color: color-mix(in srgb, var(--primary) 34%, var(--line));
+}

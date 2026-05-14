@@ -20,6 +20,7 @@ import {
   getBlobStorageMaxBytes,
   putBlobObject,
 } from '../services/blob-store';
+import { auditRequestMetadata, writeAuditEvent } from '../services/audit-events';
 
 function notifyVaultSyncForRequest(
   request: Request,
@@ -28,6 +29,27 @@ function notifyVaultSyncForRequest(
   revisionDate: string
 ): void {
   notifyUserVaultSync(env, userId, revisionDate, readActingDeviceIdentifier(request));
+}
+
+async function writeAttachmentAudit(
+  storage: StorageService,
+  request: Request,
+  userId: string,
+  action: string,
+  metadata: Record<string, unknown>
+): Promise<void> {
+  await writeAuditEvent(storage, {
+    actorUserId: userId,
+    action,
+    category: 'data',
+    level: action.includes('delete') ? 'security' : 'info',
+    targetType: 'attachment',
+    targetId: typeof metadata.id === 'string' ? metadata.id : null,
+    metadata: {
+      ...metadata,
+      ...auditRequestMetadata(request),
+    },
+  });
 }
 
 // Format file size to human readable
@@ -430,6 +452,11 @@ export async function handleDeleteAttachment(
   const revisionInfo = await storage.updateCipherRevisionDate(cipherId);
   if (revisionInfo) {
     notifyVaultSyncForRequest(request, env, revisionInfo.userId, revisionInfo.revisionDate);
+    await writeAttachmentAudit(storage, request, revisionInfo.userId, 'attachment.delete', {
+      id: attachmentId,
+      cipherId,
+      size: attachment.size,
+    });
   }
 
   // Get updated cipher for response

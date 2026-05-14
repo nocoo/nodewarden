@@ -23,6 +23,22 @@ export interface VerifiedAccessContext {
   user: User;
 }
 
+export type RefreshAccessTokenFailureReason =
+  | 'token_not_found_or_expired'
+  | 'user_missing'
+  | 'user_inactive'
+  | 'device_missing'
+  | 'device_session_mismatch';
+
+export type RefreshAccessTokenResult =
+  | { ok: true; accessToken: string; user: User; device: { identifier: string; sessionStamp: string } | null }
+  | {
+      ok: false;
+      reason: RefreshAccessTokenFailureReason;
+      userId?: string | null;
+      deviceIdentifier?: string | null;
+    };
+
 export class AuthService {
   private storage: StorageService;
   private static userCache = new Map<string, CachedUserEntry>();
@@ -223,17 +239,18 @@ export class AuthService {
   }
 
   // Refresh access token
-  async refreshAccessToken(
-    refreshToken: string
-  ): Promise<{ accessToken: string; user: User; device: { identifier: string; sessionStamp: string } | null } | null> {
+  async refreshAccessTokenDetailed(refreshToken: string): Promise<RefreshAccessTokenResult> {
     const record = await this.storage.getRefreshTokenRecord(refreshToken);
-    if (!record?.userId) return null;
+    if (!record?.userId) return { ok: false, reason: 'token_not_found_or_expired' };
 
     const user = await this.storage.getUserById(record.userId);
-    if (!user) return null;
+    if (!user) {
+      await this.storage.deleteRefreshToken(refreshToken);
+      return { ok: false, reason: 'user_missing', userId: record.userId, deviceIdentifier: record.deviceIdentifier };
+    }
     if (user.status !== 'active') {
       await this.storage.deleteRefreshToken(refreshToken);
-      return null;
+      return { ok: false, reason: 'user_inactive', userId: user.id, deviceIdentifier: record.deviceIdentifier };
     }
 
     let device: { identifier: string; sessionStamp: string } | null = null;
@@ -241,16 +258,23 @@ export class AuthService {
       const boundDevice = await this.storage.getDevice(user.id, record.deviceIdentifier);
       if (!boundDevice) {
         await this.storage.deleteRefreshToken(refreshToken);
-        return null;
+        return { ok: false, reason: 'device_missing', userId: user.id, deviceIdentifier: record.deviceIdentifier };
       }
       if (!record.deviceSessionStamp || boundDevice.sessionStamp !== record.deviceSessionStamp) {
         await this.storage.deleteRefreshToken(refreshToken);
-        return null;
+        return { ok: false, reason: 'device_session_mismatch', userId: user.id, deviceIdentifier: record.deviceIdentifier };
       }
       device = { identifier: boundDevice.deviceIdentifier, sessionStamp: boundDevice.sessionStamp };
     }
 
     const accessToken = await this.generateAccessToken(user, device);
-    return { accessToken, user, device };
+    return { ok: true, accessToken, user, device };
+  }
+
+  async refreshAccessToken(
+    refreshToken: string
+  ): Promise<{ accessToken: string; user: User; device: { identifier: string; sessionStamp: string } | null } | null> {
+    const result = await this.refreshAccessTokenDetailed(refreshToken);
+    return result.ok ? result : null;
   }
 }

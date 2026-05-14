@@ -803,6 +803,13 @@ export async function deleteCipher(authedFetch: AuthedFetch, cipherId: string): 
   return (await parseJson<Cipher>(resp))!;
 }
 
+export async function permanentDeleteCipher(authedFetch: AuthedFetch, cipherId: string): Promise<void> {
+  const id = String(cipherId || '').trim();
+  if (!id) throw new Error('Cipher id is required');
+  const resp = await authedFetch(`/api/ciphers/${encodeURIComponent(id)}/delete`, { method: 'DELETE' });
+  if (!resp.ok) throw new Error('Permanent delete item failed');
+}
+
 export async function archiveCipher(authedFetch: AuthedFetch, cipherId: string): Promise<Cipher> {
   const id = String(cipherId || '').trim();
   if (!id) throw new Error('Cipher id is required');
