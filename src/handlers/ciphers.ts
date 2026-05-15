@@ -263,6 +263,196 @@ export function formatAttachments(attachments: Attachment[]): any[] | null {
   return formatted.length ? formatted : null;
 }
 
+function formatAttachmentSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} Bytes`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+interface IncomingAttachmentMetadata {
+  id: string;
+  fileName?: unknown;
+  key?: unknown;
+  fileSize?: unknown;
+  hasFileName: boolean;
+  hasKey: boolean;
+  hasFileSize: boolean;
+}
+
+function readIncomingAttachmentMetadataMap(
+  value: unknown,
+  options: { legacyFileNameMap?: boolean } = {}
+): IncomingAttachmentMetadata[] {
+  if (!value || typeof value !== 'object') return [];
+  const out: IncomingAttachmentMetadata[] = [];
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (!item || typeof item !== 'object') continue;
+      const row = item as Record<string, unknown>;
+      const id = String(row.id ?? row.Id ?? '').trim();
+      if (!id) continue;
+      const fileName = getAliasedProp(row, ['fileName', 'FileName']);
+      const key = getAliasedProp(row, ['key', 'Key']);
+      const fileSize = getAliasedProp(row, ['fileSize', 'FileSize', 'size', 'Size']);
+      out.push({
+        id,
+        fileName: fileName.value,
+        key: key.value,
+        fileSize: fileSize.value,
+        hasFileName: fileName.present,
+        hasKey: key.present,
+        hasFileSize: fileSize.present,
+      });
+    }
+    return out;
+  }
+
+  for (const [rawId, rawValue] of Object.entries(value as Record<string, unknown>)) {
+    const id = String(rawId || '').trim();
+    if (!id) continue;
+
+    if (options.legacyFileNameMap && (typeof rawValue === 'string' || rawValue == null)) {
+      out.push({
+        id,
+        fileName: rawValue,
+        key: undefined,
+        fileSize: undefined,
+        hasFileName: rawValue != null,
+        hasKey: false,
+        hasFileSize: false,
+      });
+      continue;
+    }
+
+    if (!rawValue || typeof rawValue !== 'object') continue;
+    const row = rawValue as Record<string, unknown>;
+    const fileName = getAliasedProp(row, ['fileName', 'FileName']);
+    const key = getAliasedProp(row, ['key', 'Key']);
+    const fileSize = getAliasedProp(row, ['fileSize', 'FileSize', 'size', 'Size']);
+    out.push({
+      id,
+      fileName: fileName.value,
+      key: key.value,
+      fileSize: fileSize.value,
+      hasFileName: fileName.present,
+      hasKey: key.present,
+      hasFileSize: fileSize.present,
+    });
+  }
+
+  return out;
+}
+
+function readIncomingAttachmentMetadata(source: any): IncomingAttachmentMetadata[] {
+  const merged = new Map<string, IncomingAttachmentMetadata>();
+  const legacy = getAliasedProp(source, ['attachments', 'Attachments']);
+  const current = getAliasedProp(source, ['attachments2', 'Attachments2']);
+
+  if (legacy.present) {
+    for (const item of readIncomingAttachmentMetadataMap(legacy.value, { legacyFileNameMap: true })) {
+      merged.set(item.id, item);
+    }
+  }
+
+  if (current.present) {
+    for (const item of readIncomingAttachmentMetadataMap(current.value)) {
+      const previous = merged.get(item.id);
+      merged.set(item.id, {
+        id: item.id,
+        fileName: item.hasFileName ? item.fileName : previous?.fileName,
+        key: item.hasKey ? item.key : previous?.key,
+        fileSize: item.hasFileSize ? item.fileSize : previous?.fileSize,
+        hasFileName: item.hasFileName || previous?.hasFileName || false,
+        hasKey: item.hasKey || previous?.hasKey || false,
+        hasFileSize: item.hasFileSize || previous?.hasFileSize || false,
+      });
+    }
+  }
+
+  return [...merged.values()];
+}
+
+function hasIncomingAttachmentMetadata(source: any): boolean {
+  return readIncomingAttachmentMetadata(source).length > 0;
+}
+
+async function syncIncomingAttachmentMetadata(
+  storage: StorageService,
+  cipherId: string,
+  cipherData: any
+): Promise<void> {
+  const incoming = readIncomingAttachmentMetadata(cipherData);
+  if (!incoming.length) return;
+
+  const currentById = new Map((await storage.getAttachmentsByCipher(cipherId)).map((attachment) => [attachment.id, attachment]));
+  for (const item of incoming) {
+    const attachment = currentById.get(item.id);
+    if (!attachment) continue;
+
+    let changed = false;
+    if (item.hasFileName) {
+      const fileName = String(item.fileName || '').trim();
+      if (isValidEncString(fileName) && fileName !== attachment.fileName) {
+        attachment.fileName = fileName;
+        changed = true;
+      }
+    }
+
+    if (item.hasKey) {
+      const key = optionalEncString(item.key);
+      if (key !== attachment.key) {
+        attachment.key = key;
+        changed = true;
+      }
+    }
+
+    if (item.hasFileSize) {
+      const size = Number(item.fileSize);
+      if (Number.isFinite(size) && size >= 0 && size !== Number(attachment.size || 0)) {
+        attachment.size = size;
+        attachment.sizeName = formatAttachmentSize(size);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      await storage.saveAttachment(attachment);
+    }
+  }
+}
+
+export function applyCipherEmbeddedAttachmentMetadata(cipherData: any, attachments: Attachment[]): Attachment[] {
+  const incoming = readIncomingAttachmentMetadata(cipherData);
+  if (!incoming.length || !attachments.length) return attachments;
+
+  const incomingById = new Map(incoming.map((item) => [item.id, item]));
+  return attachments.map((attachment) => {
+    const item = incomingById.get(attachment.id);
+    if (!item) return attachment;
+
+    const next: Attachment = { ...attachment };
+    if (item.hasFileName) {
+      const fileName = String(item.fileName || '').trim();
+      if (isValidEncString(fileName)) {
+        next.fileName = fileName;
+      }
+    }
+    if (item.hasKey) {
+      next.key = optionalEncString(item.key);
+    }
+    if (item.hasFileSize) {
+      const size = Number(item.fileSize);
+      if (Number.isFinite(size) && size >= 0) {
+        next.size = size;
+        next.sizeName = formatAttachmentSize(size);
+      }
+    }
+    return next;
+  });
+}
+
 function normalizeCipherFieldsForCompatibility(fields: any): any[] | null {
   if (!Array.isArray(fields) || fields.length === 0) return null;
   const out = fields
@@ -329,6 +519,7 @@ export function cipherToResponse(
     'licenseNumber',
   ]);
   const normalizedSshKey = normalizeCipherSshKeyForCompatibility((passthrough as any).sshKey ?? null);
+  const responseAttachments = applyCipherEmbeddedAttachmentMetadata(cipher, attachments);
 
   return {
     // Pass through ALL stored cipher fields (known + unknown)
@@ -350,7 +541,7 @@ export function cipherToResponse(
     },
     object: 'cipherDetails',
     collectionIds: Array.isArray((passthrough as any).collectionIds) ? (passthrough as any).collectionIds : [],
-    attachments: formatAttachments(attachments),
+    attachments: formatAttachments(responseAttachments),
     name: isValidEncString(cipher.name) ? cipher.name.trim() : cipher.name,
     notes: optionalEncString(cipher.notes),
     login: normalizedLogin,
@@ -524,8 +715,9 @@ export async function handleUpdateCipher(request: Request, env: Env, userId: str
   const incomingSshKey = readCipherProp<CipherSshKey | null>(cipherData, ['sshKey', 'SshKey']);
   const incomingPasswordHistory = readCipherProp<PasswordHistory[] | null>(cipherData, ['passwordHistory', 'PasswordHistory']);
   const incomingRevisionDate = readCipherRevisionDate(cipherData);
+  const hasAttachmentMigrationMetadata = hasIncomingAttachmentMetadata(cipherData);
 
-  if (isStaleCipherUpdate(existingCipher.updatedAt, incomingRevisionDate)) {
+  if (!hasAttachmentMigrationMetadata && isStaleCipherUpdate(existingCipher.updatedAt, incomingRevisionDate)) {
     return errorResponse('The client copy of this cipher is out of date. Resync the client and try again.', 400);
   }
 
@@ -580,6 +772,7 @@ export async function handleUpdateCipher(request: Request, env: Env, userId: str
     if (!folderOk) return errorResponse('Folder not found', 404);
   }
 
+  await syncIncomingAttachmentMetadata(storage, cipher.id, cipherData);
   await storage.saveCipher(cipher);
   const revisionDate = await storage.updateRevisionDate(userId);
   notifyVaultSyncForRequest(request, env, userId, revisionDate);

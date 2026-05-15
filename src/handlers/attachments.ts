@@ -10,7 +10,7 @@ import {
   verifyAttachmentUploadToken,
   verifyFileDownloadToken,
 } from '../utils/jwt';
-import { cipherToResponse } from './ciphers';
+import { applyCipherEmbeddedAttachmentMetadata, cipherToResponse } from './ciphers';
 import { LIMITS } from '../config/limits';
 import { readActingDeviceIdentifier } from '../utils/device';
 import {
@@ -282,6 +282,7 @@ export async function handleGetAttachment(
   if (!attachment || attachment.cipherId !== cipherId) {
     return errorResponse('Attachment not found', 404);
   }
+  const responseAttachment = applyCipherEmbeddedAttachmentMetadata(cipher, [attachment])[0] || attachment;
 
   // Generate short-lived download token
   const token = await createFileDownloadToken(cipherId, attachmentId, env.JWT_SECRET);
@@ -292,12 +293,12 @@ export async function handleGetAttachment(
 
   return jsonResponse({
     object: 'attachment',
-    id: attachment.id,
+    id: responseAttachment.id,
     url: downloadUrl,
-    fileName: attachment.fileName,
-    key: attachment.key,
-    size: String(Number(attachment.size) || 0),
-    sizeName: attachment.sizeName,
+    fileName: responseAttachment.fileName,
+    key: responseAttachment.key,
+    size: String(Number(responseAttachment.size) || 0),
+    sizeName: responseAttachment.sizeName,
   });
 }
 
