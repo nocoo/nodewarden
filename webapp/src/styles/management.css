@@ -1413,6 +1413,49 @@
   color: #667085;
 }
 
+.authorized-devices-table {
+  table-layout: fixed;
+}
+
+.authorized-devices-col-device {
+  width: 28%;
+}
+
+.authorized-devices-col-type {
+  width: 7%;
+}
+
+.authorized-devices-col-status {
+  width: 6%;
+}
+
+.authorized-devices-col-date {
+  width: 11%;
+}
+
+.authorized-devices-col-trust {
+  width: 11%;
+}
+
+.authorized-devices-col-actions {
+  width: 26%;
+}
+
+.authorized-devices-table td:first-child {
+  overflow-wrap: anywhere;
+}
+
+.authorized-devices-actions {
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+.authorized-devices-actions .btn.small {
+  flex: 0 0 auto;
+  padding-inline: 8px;
+  white-space: nowrap;
+}
+
 .input.small {
   @apply w-[120px];
 }

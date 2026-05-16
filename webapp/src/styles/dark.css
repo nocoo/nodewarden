@@ -151,11 +151,13 @@
 
 /* ── dark mode scrollbar ── */
 :root[data-theme='dark'] ::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--muted) 24%, transparent);
+  background: color-mix(in srgb, var(--muted) 30%, transparent);
+  background-clip: content-box;
 }
 
 :root[data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--muted) 44%, transparent);
+  background: color-mix(in srgb, var(--primary) 40%, var(--muted) 22%);
+  background-clip: content-box;
 }
 
 /* ── dark mode backdrop-filter ── */
